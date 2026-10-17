@@ -187,6 +187,15 @@ export function useCalibr8State() {
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    const res = await api.profile.getMe();
+    if (!res.success || !res.user) {
+      throw new Error("Failed to refresh account profile.");
+    }
+    setUser(res.user);
+    return res.user;
+  };
+
   const updateProfileName = async (name) => {
     const res = await api.profile.updateMe({ name });
     if (res.success && res.user) {
@@ -306,6 +315,7 @@ export function useCalibr8State() {
     login,
     register,
     logout,
+    refreshUser,
     updateProfileName,
     changePassword,
     saveOnboarding,

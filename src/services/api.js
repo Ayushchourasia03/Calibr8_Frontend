@@ -214,4 +214,23 @@ export const api = {
       });
     },
   },
+
+     social: {
+    getLinkUrl: async (provider) => {
+      return await request(`/api/social/${provider}/link-url`, {
+        method: "GET",
+      });
+    },
+    unlink: async (provider) => {
+      return await request(`/api/social/${provider}`, {
+        method: "DELETE",
+      });
+    },
+    // Optional: to check connected accounts without reloading /me
+    getAccounts: async () => {
+      return await request(`/api/social`, {
+        method: "GET",
+      });
+    }
+  }
 };

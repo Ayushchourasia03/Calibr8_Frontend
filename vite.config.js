@@ -36,6 +36,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true,
       proxy: Object.fromEntries(
         [
+          "/api",
           "/auth",
           "/health",
           "/me",
