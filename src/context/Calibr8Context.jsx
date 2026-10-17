@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from "react";
+import { createContext, useContext } from "react";
 import { useCalibr8State } from "./useCalibr8State";
 
 const Calibr8Context = createContext(null);
@@ -10,6 +10,7 @@ export function Calibr8Provider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useCalibr8 = () => {
   const ctx = useContext(Calibr8Context);
   if (!ctx) throw new Error("useCalibr8 must be used within Calibr8Provider");

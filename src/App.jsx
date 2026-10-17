@@ -1,8 +1,8 @@
-import React from "react";
 import { Calibr8Provider, useCalibr8 } from "./context/Calibr8Context";
 import { Header } from "./components/common/Header";
 import { DockNav } from "./components/common/DockNav";
 import { LevelModal } from "./components/common/LevelModal";
+import { AuthModal } from "./components/common/AuthModal";
 
 import { LandingView } from "./features/landing/LandingView";
 import { TodayView } from "./features/today/TodayView";
@@ -65,6 +65,8 @@ function MainContent() {
         onClose={() => setLevelModalOpen(false)}
         isFirstTime={!state.started}
       />
+
+      <AuthModal />
     </div>
   );
 }

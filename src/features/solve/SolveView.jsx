@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { LANGS } from "../../constants";
 import { useStrictModeGuard } from "../../hooks/useStrictModeGuard";

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { TIERS, BANK, DEFAULT_QUESTION, DIFFICULTY_LABELS } from "../constants";
+import { api, tokenStorage } from "../services/api";
 
 const STORAGE_KEY = "calibr8-react-v1";
 
@@ -57,7 +58,69 @@ export function useCalibr8State() {
 
   const [currentQ, setCurrentQ] = useState(DEFAULT_QUESTION);
   const [isLevelModalOpen, setLevelModalOpen] = useState(false);
+  const [isAuthModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [user, setUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [apiTopics, setApiTopics] = useState([]);
+  const [dsaTopics, setDsaTopics] = useState([]);
+  const [coreTopics, setCoreTopics] = useState([]);
 
+  // Check existing token and fetch authenticated user on load
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initUser() {
+      const token = tokenStorage.get();
+      if (!token) {
+        if (isMounted) setIsAuthLoading(false);
+        return;
+      }
+
+      try {
+        const res = await api.auth.getMe();
+        if (isMounted && res.success && res.user) {
+          setUser(res.user);
+          // Sync rating and levels if user was already calibrated
+          if (res.user.rating) {
+            setState((s) => ({
+              ...s,
+              rating: res.user.rating,
+              started: res.user.onboarded || s.started
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn("Session check failed or expired:", err.message);
+        tokenStorage.remove();
+        if (isMounted) setUser(null);
+      } finally {
+        if (isMounted) setIsAuthLoading(false);
+      }
+    }
+
+    async function loadTopics() {
+      try {
+        const res = await api.topics.getAll();
+        if (isMounted && res.success) {
+          setApiTopics(res.topics || []);
+          setDsaTopics(res.dsaTopics || []);
+          setCoreTopics(res.coreTopics || []);
+        }
+      } catch (err) {
+        console.warn("Could not fetch remote topics, using local fallback:", err.message);
+      }
+    }
+
+    initUser();
+    loadTopics();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Save local state changes
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -65,6 +128,70 @@ export function useCalibr8State() {
       console.error(e);
     }
   }, [state]);
+
+  const login = async ({ email, password }) => {
+    const res = await api.auth.login({ email, password });
+    if (res.success && res.user) {
+      setUser(res.user);
+      if (res.user.rating) {
+        setState((s) => ({
+          ...s,
+          rating: res.user.rating,
+          started: res.user.onboarded || s.started
+        }));
+      }
+    }
+    return res;
+  };
+
+  const register = async ({ name, email, password }) => {
+    const res = await api.auth.register({ name, email, password });
+    if (res.success && res.user) {
+      setUser(res.user);
+      if (res.user.rating) {
+        setState((s) => ({
+          ...s,
+          rating: res.user.rating,
+          started: res.user.onboarded || s.started
+        }));
+      }
+    }
+    return res;
+  };
+
+  const logout = async () => {
+    await api.auth.logout();
+    setUser(null);
+  };
+
+  const updateProfileName = async (name) => {
+    const res = await api.profile.updateMe({ name });
+    if (res.success && res.user) {
+      setUser(res.user);
+    }
+    return res;
+  };
+
+  const changePassword = async (oldPassword, newPassword) => {
+    return await api.auth.changePassword({ oldPassword, newPassword });
+  };
+
+  const saveOnboarding = async (payload) => {
+    // If authenticated, persist to backend API
+    if (user && tokenStorage.get()) {
+      try {
+        const res = await api.onboarding.submit(payload);
+        if (res.success && res.user) {
+          setUser(res.user);
+          return res.user;
+        }
+      } catch (err) {
+        console.warn("Onboarding API sync failed:", err.message);
+        throw err;
+      }
+    }
+    return null;
+  };
 
   const getTier = (r = state.rating) =>
     TIERS[Math.min(5, Math.max(0, Math.floor((r - 700) / 200)))];
@@ -134,6 +261,22 @@ export function useCalibr8State() {
     setCurrentQ,
     isLevelModalOpen,
     setLevelModalOpen,
+    isAuthModalOpen,
+    setAuthModalOpen,
+    authMode,
+    setAuthMode,
+    user,
+    setUser,
+    isAuthLoading,
+    apiTopics,
+    dsaTopics,
+    coreTopics,
+    login,
+    register,
+    logout,
+    updateProfileName,
+    changePassword,
+    saveOnboarding,
     getTier,
     getTopicRating,
     getOverallRating,

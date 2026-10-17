@@ -1,4 +1,3 @@
-import React from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 
 export function LibraryView() {

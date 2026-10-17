@@ -1,8 +1,17 @@
-import React, { useRef } from "react";
+import { useRef } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 
 export function LandingView() {
-  const { state, setView, setLevelModalOpen } = useCalibr8();
+  const {
+    state,
+    setView,
+    setLevelModalOpen,
+    user,
+    login,
+    setAuthModalOpen,
+    setAuthMode
+  } = useCalibr8();
+
   const heroRef = useRef(null);
 
   const handlePointerMove = (e) => {
@@ -10,6 +19,15 @@ export function LandingView() {
     const rect = heroRef.current.getBoundingClientRect();
     heroRef.current.style.setProperty("--x", `${e.clientX - rect.left}px`);
     heroRef.current.style.setProperty("--y", `${e.clientY - rect.top}px`);
+  };
+
+  const handleDemoSignIn = async () => {
+    try {
+      await login({ email: "jane@example.com", password: "password123" });
+      setView("home");
+    } catch {
+      setView("home");
+    }
   };
 
   return (
@@ -34,12 +52,35 @@ export function LandingView() {
           <div className="text-2xl font-bold font-serif tracking-tight text-white">
             Calibr<span className="text-blue-500">8</span>
           </div>
-          <button
-            onClick={() => setView("home")}
-            className="rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold text-cyan-300 hover:bg-blue-500/20"
-          >
-            Explore Demo Account
-          </button>
+
+          <div className="flex items-center gap-3">
+            {user ? (
+              <button
+                onClick={() => setView("home")}
+                className="rounded-full border border-blue-400/40 bg-blue-500/20 px-4 py-1.5 text-xs font-semibold text-cyan-300 hover:bg-blue-500/30"
+              >
+                Go to Dashboard ({user.name})
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setAuthMode("login");
+                    setAuthModalOpen(true);
+                  }}
+                  className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={handleDemoSignIn}
+                  className="rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold text-cyan-300 hover:bg-blue-500/20"
+                >
+                  Explore Demo Account
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="relative z-10 max-w-2xl">

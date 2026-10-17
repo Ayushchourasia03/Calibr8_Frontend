@@ -1,4 +1,3 @@
-import React from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { TIERS, DIFFICULTY_LABELS } from "../../constants";
 
@@ -6,7 +5,6 @@ export function TodayView() {
   const {
     state,
     getTier,
-    getTopicRating,
     createQuestion,
     setCurrentQ,
     setView,
@@ -17,7 +15,9 @@ export function TodayView() {
   const dailyQ = state.daily || createQuestion(false);
   const stretchQ = state.stretch || createQuestion(true);
   const gaugePct = Math.max(5, Math.min(95, ((state.rating - 700) % 200) / 2));
-  const topicsList = Object.keys(state.levels || {});
+  const topicsList = Object.keys(state.levels || {}).length > 0
+    ? Object.keys(state.levels)
+    : ["Arrays", "Sliding Window", "Graphs"];
 
   const handleOpenDaily = () => {
     setCurrentQ(dailyQ);
@@ -143,14 +143,14 @@ export function TodayView() {
                 <div className="flex justify-between text-xs text-slate-300 mb-1">
                   <span>{topic}</span>
                   <span className="font-semibold text-cyan-400">
-                    {DIFFICULTY_LABELS[state.levels[topic]]}
+                    {DIFFICULTY_LABELS[state.levels[topic] ?? 1]}
                   </span>
                 </div>
                 <input
                   type="range"
                   min="0"
                   max="2"
-                  value={state.levels[topic]}
+                  value={state.levels[topic] ?? 1}
                   onChange={(e) => setTopicLevel(topic, Number(e.target.value))}
                   className="w-full accent-blue-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
                 />
