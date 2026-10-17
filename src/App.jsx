@@ -48,7 +48,13 @@ function MainContent() {
     }[state.theme] || "";
 
   return (
-    <div className={`min-h-screen bg-[#000511] text-slate-100 ${themeClasses}`}>
+    <div
+      className={`min-h-screen ${
+        state.view === "landing"
+          ? "bg-white text-slate-900"
+          : "bg-[#000511] text-slate-100"
+      } ${themeClasses}`}
+    >
       <Header />
       <DockNav />
 
