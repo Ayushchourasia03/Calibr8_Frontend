@@ -5,6 +5,27 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const backendUrl = env.VITE_API_URL || "http://localhost:3000";
+  let hasLoggedBackendConnection = false;
+
+  const createBackendProxy = () => ({
+    target: backendUrl,
+    changeOrigin: true,
+    configure: (proxy) => {
+      proxy.on("proxyRes", (proxyResponse, request) => {
+        if (
+          !hasLoggedBackendConnection &&
+          request.url?.split("?")[0] === "/health" &&
+          proxyResponse.statusCode >= 200 &&
+          proxyResponse.statusCode < 300
+        ) {
+          hasLoggedBackendConnection = true;
+          console.log(
+            `[Calibr8] Frontend connected to backend at ${backendUrl}`,
+          );
+        }
+      });
+    },
+  });
 
   return {
     plugins: [react(), tailwindcss()],
@@ -22,7 +43,7 @@ export default defineConfig(({ mode }) => {
           "/ping",
           "/topic",
           "/topics",
-        ].map((route) => [route, { target: backendUrl, changeOrigin: true }]),
+        ].map((route) => [route, createBackendProxy()]),
       ),
     },
   };
