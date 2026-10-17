@@ -22,8 +22,14 @@ export function useCalibr8State() {
       levels: { "Sliding Window": 1, Graphs: 2, Arrays: 1 },
       ratings: { "Sliding Window": 1250, Graphs: 1700, Arrays: 1250 },
       topics: {
-        Arrays: 2, Strings: 1, Recursion: 0, Graphs: 3,
-        "Sliding Window": 1, DP: 0, SQL: 1, Aptitude: 2
+        Arrays: 2,
+        Strings: 1,
+        Recursion: 0,
+        Graphs: 3,
+        "Sliding Window": 1,
+        DP: 0,
+        SQL: 1,
+        Aptitude: 2,
       },
       videos: { "Sliding Window": false, Graphs: true },
       solves: 6,
@@ -34,7 +40,7 @@ export function useCalibr8State() {
       best: {},
       revise: [],
       dayStamp: today,
-      started: false
+      started: false,
     };
 
     try {
@@ -86,7 +92,7 @@ export function useCalibr8State() {
             setState((s) => ({
               ...s,
               rating: res.user.rating,
-              started: res.user.onboarded || s.started
+              started: res.user.onboarded || s.started,
             }));
           }
         }
@@ -108,12 +114,29 @@ export function useCalibr8State() {
           setCoreTopics(res.coreTopics || []);
         }
       } catch (err) {
-        console.warn("Could not fetch remote topics, using local fallback:", err.message);
+        console.warn(
+          "Could not fetch remote topics, using local fallback:",
+          err.message,
+        );
+      }
+    }
+
+    async function checkBackend() {
+      try {
+        const res = await api.system.health();
+        if (isMounted && res.status === "ok") {
+          console.log("[Calibr8] Connected to backend:", res.service);
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.warn("[Calibr8] Backend connection failed:", err.message);
+        }
       }
     }
 
     initUser();
     loadTopics();
+    checkBackend();
 
     return () => {
       isMounted = false;
@@ -137,7 +160,7 @@ export function useCalibr8State() {
         setState((s) => ({
           ...s,
           rating: res.user.rating,
-          started: res.user.onboarded || s.started
+          started: res.user.onboarded || s.started,
         }));
       }
     }
@@ -152,7 +175,7 @@ export function useCalibr8State() {
         setState((s) => ({
           ...s,
           rating: res.user.rating,
-          started: res.user.onboarded || s.started
+          started: res.user.onboarded || s.started,
         }));
       }
     }
@@ -208,7 +231,9 @@ export function useCalibr8State() {
 
   const createQuestion = (isStretch = false) => {
     const L = state.levels || { Arrays: 1 };
-    const ts = Object.keys(L).sort((a, b) => getTopicRating(a) - getTopicRating(b));
+    const ts = Object.keys(L).sort(
+      (a, b) => getTopicRating(a) - getTopicRating(b),
+    );
     const topic = ts[(isStretch ? (state.stretchN || 0) + 1 : 0) % ts.length];
     const lvl = L[topic] ?? 1;
     const b = BANK[topic] || ["Challenge", "Solve the challenge"];
@@ -220,16 +245,20 @@ export function useCalibr8State() {
       d: Math.round(getTopicRating(topic) - 147 + (isStretch ? 120 : 0)),
       title: `${b[0]} (${DIFFICULTY_LABELS[lvl]})`,
       text: b[1],
-      ex: isSw ? "readings = [4, 8, 5, 1, 7], k = 4  ->  3" : "See the statement details.",
+      ex: isSw
+        ? "readings = [4, 8, 5, 1, 7], k = 4  ->  3"
+        : "See the statement details.",
       pts: [10, 25, 50][lvl],
       key: `${topic}_${lvl}_${isStretch ? "s" + state.stretchN : "d"}_${state.dayStamp}`,
-      hints: isSw ? DEFAULT_QUESTION.hints : [
-        "Think about what you must track as you scan the input.",
-        "Name the pattern that keeps that information cheaply.",
-        "Outline: set up, loop once, update the answer, return it."
-      ],
+      hints: isSw
+        ? DEFAULT_QUESTION.hints
+        : [
+            "Think about what you must track as you scan the input.",
+            "Name the pattern that keeps that information cheaply.",
+            "Outline: set up, loop once, update the answer, return it.",
+          ],
       trace: isSw ? DEFAULT_QUESTION.trace : [["Ready", "[]", "0", "0", "0"]],
-      stretch: Boolean(isStretch)
+      stretch: Boolean(isStretch),
     };
   };
 
@@ -249,7 +278,10 @@ export function useCalibr8State() {
         ...s,
         levels: nextLevels,
         ratings: nextRatings,
-        rating: Math.round(Object.values(nextRatings).reduce((a, b) => a + b, 0) / Object.values(nextRatings).length)
+        rating: Math.round(
+          Object.values(nextRatings).reduce((a, b) => a + b, 0) /
+            Object.values(nextRatings).length,
+        ),
       };
     });
   };
@@ -282,6 +314,6 @@ export function useCalibr8State() {
     getOverallRating,
     createQuestion,
     setView,
-    setTopicLevel
+    setTopicLevel,
   };
 }
