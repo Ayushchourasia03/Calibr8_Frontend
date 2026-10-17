@@ -1,6 +1,10 @@
-import { useState } from "react";
-import { ALL_TOPICS, DIFFICULTY_LABELS } from "../../constants";
+import { useMemo, useState } from "react";
+import { ALL_TOPICS } from "../../constants";
 import { useCalibr8 } from "../../context/Calibr8Context";
+
+const LEVEL_LABELS = ["Easy", "Mid", "Hard"];
+const LEVEL_VALUES = ["easy", "medium", "hard"];
+const LEVEL_RATINGS = [800, 1200, 1600];
 
 export function LevelModal({ isOpen, onClose, isFirstTime = false }) {
   const {
@@ -10,95 +14,83 @@ export function LevelModal({ isOpen, onClose, isFirstTime = false }) {
     user,
     saveOnboarding,
     apiTopics,
-    dsaTopics
+    dsaTopics,
   } = useCalibr8();
 
-  // Combine topics from API or fallback
-  const topicList = apiTopics && apiTopics.length > 0
-    ? apiTopics
-    : ALL_TOPICS.map(name => ({ id: name.toLowerCase().replace(/\s+/g, '-'), name, category: 'DSA' }));
+  const topicList = useMemo(() => {
+    const isDsaTopic = (topic) =>
+      topic.category?.toUpperCase() === "DSA" ||
+      topic.slug?.toLowerCase().startsWith("dsa");
+    const availableTopics = dsaTopics.length
+      ? dsaTopics
+      : apiTopics.filter(isDsaTopic);
 
-  const [levels, setLevels] = useState(() => {
-    if (state.levels && Object.keys(state.levels).length > 0) {
-      return { ...state.levels };
-    }
-    return { Arrays: 0, "DSA - Arrays": 0 };
-  });
+    if (availableTopics.length) return availableTopics;
+
+    return ALL_TOPICS.filter((name) => !["SQL", "Aptitude"].includes(name)).map(
+      (name) => ({
+        id: name.toLowerCase().replace(/\s+/g, "-"),
+        name,
+        category: "DSA",
+      }),
+    );
+  }, [apiTopics, dsaTopics]);
+
+  const [levelChoices, setLevelChoices] = useState(() => ({ ...state.levels }));
+  const levels = Object.fromEntries(
+    topicList.map((topic) => [topic.name, levelChoices[topic.name] ?? null]),
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   if (!isOpen) return null;
 
-  const toggleTopic = (topicName) => {
-    setLevels((prev) => {
-      const next = { ...prev };
-      if (topicName in next) {
-        if (Object.keys(next).length > 1) {
-          delete next[topicName];
-        }
-      } else {
-        next[topicName] = 1; // Default to medium if newly activated
-      }
-      return next;
-    });
-  };
-
   const changeLevel = (topicName, lvl) => {
-    setLevels((prev) => ({ ...prev, [topicName]: lvl }));
+    setLevelChoices((prev) => ({ ...prev, [topicName]: lvl }));
   };
 
-  // 1-Click Beginner Preset
-  const handleBeginnerPreset = async () => {
-    setError("");
-    setSaving(true);
-    try {
-      const beginnerLevels = {};
-      const beginnerRatings = {};
+  // Shared by both the preset and the custom save.
+  // `chosen` = { [topicName]: 0 | 1 | 2 } covering every topic in topicList.
+  const persistCalibration = async (chosen) => {
+    const newRatings = {};
+    const topicSelections = topicList.map((topic) => {
+      const lvlIdx = chosen[topic.name];
+      newRatings[topic.name] = LEVEL_RATINGS[lvlIdx];
 
-      const dsaList = dsaTopics.length > 0 ? dsaTopics : topicList;
-      dsaList.forEach(t => {
-        beginnerLevels[t.name] = 0; // easy
-        beginnerRatings[t.name] = 800;
-      });
+      return {
+        topicId: topic.id,
+        difficulty: LEVEL_VALUES[lvlIdx],
+      };
+    });
 
-      // Also set for ALL_TOPICS if needed
-      ALL_TOPICS.forEach(name => {
-        beginnerLevels[name] = 0;
-        beginnerRatings[name] = 800;
-      });
+    const avgRating = Math.round(
+      Object.values(newRatings).reduce((a, b) => a + b, 0) / topicList.length,
+    );
 
-      // API Call: Mode 1 - 1-Click Beginner Preset
-      if (user) {
-        await saveOnboarding({
-          difficulty: "beginner",
-          topicIds: "all"
-        });
-      }
-
-      setState((s) => ({
-        ...s,
-        levels: beginnerLevels,
-        ratings: beginnerRatings,
-        rating: 800,
-        calibrating: true,
-        score: isFirstTime ? 0 : s.score,
-        started: true,
-      }));
-
-      onClose();
-      setView("home");
-    } catch (err) {
-      setError(err.message || "Failed to set beginner preset.");
-    } finally {
-      setSaving(false);
+    // Call Onboarding API if authenticated
+    if (user && topicSelections.length > 0) {
+      await saveOnboarding({ topicSelections });
     }
+
+    setState((s) => ({
+      ...s,
+      levels: chosen,
+      ratings: newRatings,
+      rating: isFirstTime ? avgRating : s.rating,
+      calibrating: isFirstTime ? true : s.calibrating,
+      score: isFirstTime ? 0 : s.score,
+      started: true,
+    }));
+
+    onClose();
+    setView("home");
   };
 
-  const handleSave = async () => {
-    const keys = Object.keys(levels);
-    if (!keys.length) {
-      setError("Please select at least 1 topic.");
+  // Option 1: all topics Easy, save and start immediately
+  const handleBeginnerPreset = async () => {
+    if (!topicList.length) {
+      setError("No DSA topics are available to calibrate.");
       return;
     }
 
@@ -106,47 +98,35 @@ export function LevelModal({ isOpen, onClose, isFirstTime = false }) {
     setSaving(true);
 
     try {
-      const newRatings = {};
-      const topicSelections = [];
-
-      keys.forEach((topicName) => {
-        const lvlIdx = levels[topicName] ?? 0;
-        const normDiff = ["easy", "medium", "hard"][lvlIdx] || "easy";
-        const ratingVal = [800, 1200, 1600][lvlIdx] || 800;
-
-        newRatings[topicName] = ratingVal;
-
-        // Find matching topic in apiTopics if available
-        const matchedObj = topicList.find(t => t.name === topicName || t.slug === topicName);
-        if (matchedObj) {
-          topicSelections.push({
-            topicId: matchedObj.id,
-            difficulty: normDiff
-          });
-        }
-      });
-
-      const avgRating = Math.round(
-        Object.values(newRatings).reduce((a, b) => a + b, 0) / keys.length
+      const allEasy = Object.fromEntries(
+        topicList.map((topic) => [topic.name, 0]),
       );
+      setLevelChoices(allEasy); // keeps the UI in sync if the save fails
+      await persistCalibration(allEasy);
+    } catch (err) {
+      setError(err.message || "Failed to apply beginner preset.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-      // Call Onboarding API if authenticated
-      if (user && topicSelections.length > 0) {
-        await saveOnboarding({ topicSelections });
-      }
+  // Option 2: custom per-topic levels
+  const handleSave = async () => {
+    if (!topicList.length) {
+      setError("No DSA topics are available to calibrate.");
+      return;
+    }
 
-      setState((s) => ({
-        ...s,
-        levels,
-        ratings: newRatings,
-        rating: isFirstTime ? avgRating : s.rating,
-        calibrating: isFirstTime ? true : s.calibrating,
-        score: isFirstTime ? 0 : s.score,
-        started: true,
-      }));
+    if (topicList.some((topic) => !Number.isInteger(levels[topic.name]))) {
+      setError("Choose Easy, Mid, or Hard for every DSA topic.");
+      return;
+    }
 
-      onClose();
-      setView("home");
+    setError("");
+    setSaving(true);
+
+    try {
+      await persistCalibration(levels);
     } catch (err) {
       setError(err.message || "Failed to save topic calibrations.");
     } finally {
@@ -165,9 +145,12 @@ export function LevelModal({ isOpen, onClose, isFirstTime = false }) {
         </button>
 
         <div className="mb-4">
-          <h2 className="text-xl font-bold font-serif mb-1">Set Topic Levels & Calibration</h2>
+          <h2 className="text-xl font-bold font-serif mb-1">
+            Set Topic Levels & Calibration
+          </h2>
           <p className="text-xs text-slate-400">
-            Tailor your daily questions with calibrated ratings. Choose your current proficiency per topic or apply a 1-click preset.
+            Start with every topic on Easy, or choose your level for each DSA
+            topic.
           </p>
         </div>
 
@@ -177,83 +160,80 @@ export function LevelModal({ isOpen, onClose, isFirstTime = false }) {
           </div>
         )}
 
-        {/* 1-Click Beginner Preset Button */}
+        {/* Option 1: 1-click beginner preset */}
         <div className="mb-5 rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-blue-900/30 to-cyan-950/40 p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-cyan-300">⚡ 1-Click Beginner Preset</span>
-                <span className="rounded bg-cyan-400/20 px-1.5 py-0.5 text-[10px] text-cyan-300 border border-cyan-400/30">
+                <span className="text-sm font-semibold text-cyan-300">
+                  ⚡ Quick Start: All Easy
+                </span>
+                <span className="rounded border border-cyan-400/30 bg-cyan-400/20 px-1.5 py-0.5 text-[10px] text-cyan-300">
                   Rating: 800
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 mt-0.5">
-                Instantly configures all DSA topics to Easy (800 baseline rating) for gentle onboarding.
+              <p className="mt-0.5 text-[11px] text-slate-300">
+                Sets every DSA topic to Easy and starts right away. You can
+                change levels later.
               </p>
             </div>
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || !topicList.length}
               onClick={handleBeginnerPreset}
-              className="rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 px-3.5 py-1.5 text-xs font-semibold text-cyan-200 transition shrink-0"
+              className="shrink-0 rounded-full border border-cyan-400/40 bg-cyan-500/20 px-3.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-500/30 disabled:opacity-50"
             >
-              Apply Preset
+              {saving ? "Saving..." : "Set All Easy & Start"}
             </button>
           </div>
         </div>
 
-        {/* Granular topic selectors */}
+        {/* Divider */}
+        <div className="mb-4 flex items-center gap-3 text-[11px] uppercase tracking-wider text-slate-500">
+          <span className="h-px flex-1 bg-slate-800" />
+          or choose per topic
+          <span className="h-px flex-1 bg-slate-800" />
+        </div>
+
+        {/* Option 2: per-topic levels */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-400 pb-1 border-b border-slate-800">
-            <span>Select & Calibrate Topics</span>
-            <span className="text-[11px]">Easy (800) • Medium (1200) • Hard (1600)</span>
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1 text-xs text-slate-400">
+            <span>DSA topics</span>
+            <span className="text-[11px]">
+              Easy (800) · Mid (1200) · Hard (1600)
+            </span>
           </div>
 
           {topicList.map((topicItem) => {
             const topicName = topicItem.name;
-            const isSelected = topicName in levels;
-            const currentLevel = levels[topicName] ?? 1;
+            const currentLevel = levels[topicName];
 
             return (
               <div
                 key={topicItem.id || topicName}
-                className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 transition ${
-                  isSelected
-                    ? "border-blue-500/30 bg-white/[0.04]"
-                    : "border-white/5 bg-white/[0.01] opacity-75"
-                }`}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-500/30 bg-white/[0.04] p-3 transition"
               >
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleTopic(topicName)}
-                    className={`rounded-full px-3.5 py-1 text-xs font-semibold transition ${
-                      isSelected
-                        ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md shadow-blue-500/20"
-                        : "border border-white/10 text-slate-400 hover:border-slate-500"
-                    }`}
-                  >
-                    {topicName}
-                  </button>
-                  {topicItem.category && (
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">
-                      {topicItem.category}
-                    </span>
-                  )}
-                </div>
+                <span className="text-sm font-semibold text-white">
+                  {topicName}
+                </span>
 
-                <div className="flex gap-1.5">
-                  {DIFFICULTY_LABELS.map((label, idx) => (
+                <div
+                  className="flex gap-1.5"
+                  role="group"
+                  aria-label={`Difficulty for ${topicName}`}
+                >
+                  {LEVEL_LABELS.map((label, idx) => (
                     <button
                       key={label}
                       type="button"
-                      disabled={!isSelected}
+                      disabled={saving}
                       onClick={() => changeLevel(topicName, idx)}
                       className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-                        isSelected && currentLevel === idx
-                          ? "bg-blue-500/30 text-cyan-300 border border-cyan-400/50"
-                          : "text-slate-400 hover:text-white disabled:opacity-30"
+                        currentLevel === idx
+                          ? "border border-cyan-400/50 bg-blue-500/30 text-cyan-300"
+                          : "border border-white/10 text-slate-400 hover:border-slate-500 hover:text-white"
                       }`}
+                      aria-pressed={currentLevel === idx}
                     >
                       {label}
                     </button>
@@ -267,9 +247,13 @@ export function LevelModal({ isOpen, onClose, isFirstTime = false }) {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="mt-6 w-full rounded-full bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:opacity-90 disabled:opacity-50 transition"
+          className="mt-6 w-full rounded-full bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition hover:opacity-90 disabled:opacity-50"
         >
-          {saving ? "Saving..." : isFirstTime ? "Start My Journey" : "Save Preferences"}
+          {saving
+            ? "Saving..."
+            : isFirstTime
+              ? "Start My Journey"
+              : "Save Preferences"}
         </button>
       </div>
     </div>
