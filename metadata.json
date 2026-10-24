@@ -1,0 +1,8 @@
+{
+  "name": "Calibr8",
+  "description": "Deliberate daily coding practice, skill rank calibration, and interview prep with adaptive topics and verified ranks.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

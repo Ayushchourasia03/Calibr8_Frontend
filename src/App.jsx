@@ -1,12 +1,19 @@
 import { Calibr8Provider, useCalibr8 } from "./context/Calibr8Context";
-import { Header } from "./components/common/Header";
-import { DockNav } from "./components/common/DockNav";
-import { LevelModal } from "./components/common/LevelModal";
-import { AuthModal } from "./components/common/AuthModal";
+import { Header } from "./components/layout/Header";
+import { DockNav } from "./components/layout/DockNav";
+import { Toast } from "./components/common/Toast";
+
+import { OnboardingModal } from "./components/modals/OnboardingModal";
+import { LevelModal } from "./components/modals/LevelModal";
+import { TierInfoModal } from "./components/modals/TierInfoModal";
+import { StatInfoModal } from "./components/modals/StatInfoModal";
+import { TrackModal } from "./components/modals/TrackModal";
+import { VideoModal } from "./components/modals/VideoModal";
 
 import { LandingView } from "./features/landing/LandingView";
 import { TodayView } from "./features/today/TodayView";
 import { SolveView } from "./features/solve/SolveView";
+import { ProblemsView } from "./features/problems/ProblemsView";
 import { LibraryView } from "./features/library/LibraryView";
 import { TracksView } from "./features/tracks/TracksView";
 import { RankingsView } from "./features/rankings/RankingsView";
@@ -14,9 +21,9 @@ import { ProfileView } from "./features/profile/ProfileView";
 import { StoreView } from "./features/store/StoreView";
 
 function MainContent() {
-  const { state, isLevelModalOpen, setLevelModalOpen } = useCalibr8();
+  const { state } = useCalibr8();
 
-  const renderCurrentView = () => {
+  const renderView = () => {
     switch (state.view) {
       case "landing":
         return <LandingView />;
@@ -24,6 +31,8 @@ function MainContent() {
         return <TodayView />;
       case "solve":
         return <SolveView />;
+      case "problems":
+        return <ProblemsView />;
       case "library":
         return <LibraryView />;
       case "tracks":
@@ -39,34 +48,23 @@ function MainContent() {
     }
   };
 
-  const themeClasses =
-    {
-      default: "",
-      pixel: "hue-rotate-90 saturate-150",
-      neon: "hue-rotate-[280deg] contrast-125",
-      race: "hue-rotate-180 brightness-110",
-    }[state.theme] || "";
-
   return (
-    <div className={`min-h-screen bg-[#000511] text-slate-100 ${themeClasses}`}>
+    <div className={state.view === "landing" ? "land" : ""}>
       <Header />
       <DockNav />
 
-      {state.view === "landing" ? (
-        <main>{renderCurrentView()}</main>
-      ) : (
-        <main className="mx-auto max-w-6xl px-4 py-8 md:pl-28 md:pr-8">
-          {renderCurrentView()}
-        </main>
-      )}
+      <main>{renderView()}</main>
 
-      <LevelModal
-        isOpen={isLevelModalOpen}
-        onClose={() => setLevelModalOpen(false)}
-        isFirstTime={!state.started}
-      />
+      {/* Global Modals */}
+      <OnboardingModal />
+      <LevelModal />
+      <TierInfoModal />
+      <StatInfoModal />
+      <TrackModal />
+      <VideoModal />
 
-      <AuthModal />
+      {/* Global Toast Notifications */}
+      <Toast />
     </div>
   );
 }

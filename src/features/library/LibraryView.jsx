@@ -1,74 +1,151 @@
 import { useCalibr8 } from "../../context/Calibr8Context";
+import { CURRICULUM } from "../../data/curriculumData";
 
 export function LibraryView() {
-  const { state, setState } = useCalibr8();
-  const topics = Object.keys(state.topics || {});
+  const { state, setState, setActiveModal, setModalData } = useCalibr8();
 
-  const handleWatchVideo = (topic) => {
-    const verified = window.confirm(
-      "Concept Check: A sliding window maintains a contiguous subarray of elements. Confirm to complete.",
-    );
-    if (verified) {
-      setState((s) => ({
-        ...s,
-        videos: { ...s.videos, [topic]: true },
-      }));
-    }
+  const selectedCatIndex = state.libCat || 0;
+  const [currentCategoryName, , subtopics] =
+    CURRICULUM[selectedCatIndex] || CURRICULUM[0];
+
+  const totalLessonsInCurriculum = CURRICULUM.reduce(
+    (total, cat) =>
+      total + cat[2].reduce((subTotal, topic) => subTotal + topic[1].length, 0),
+    0,
+  );
+
+  const completedLessonsCount = Object.values(state.lib || {}).filter(
+    Boolean,
+  ).length;
+
+  const handleLessonToggle = (category, topic, lesson) => {
+    const key = `${category}|${topic}|${lesson}`;
+    setState((s) => {
+      const nextLib = { ...s.lib, [key]: !s.lib?.[key] };
+      return { ...s, lib: nextLib };
+    });
+  };
+
+  const handleOpenVideo = (topicName) => {
+    setActiveModal("video");
+    setModalData({ topic: topicName });
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-serif font-bold text-white">
-          Curriculum Library
-        </h1>
-        <p className="text-xs text-slate-400">
-          Complete sample questions (Easy, Medium, Hard) to unlock full topic
-          problem archives.
+    <div>
+      <div style={{ marginBottom: "12px" }}>
+        <h1>Curriculum Library</h1>
+        <p className="mu" style={{ margin: "4px 0" }}>
+          From DSA fundamentals to Core CS, aptitude, English, data analytics, system design and AI in practice.{" "}
+          <b className="ok">
+            {completedLessonsCount} of {totalLessonsInCurriculum} lessons completed
+          </b>.
         </p>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {topics.map((t) => {
-          const count = state.topics[t] || 0;
-          const isVideoDone = state.videos?.[t];
+      {/* Category Pills Navigation */}
+      <div className="row">
+        {CURRICULUM.map(([catName, icon], idx) => {
+          const isSelected = idx === selectedCatIndex;
           return (
-            <div
-              key={t}
-              className="rounded-2xl border border-blue-500/20 bg-slate-900/50 p-5 backdrop-blur-xl space-y-3"
+            <button
+              key={catName}
+              onClick={() => setState((s) => ({ ...s, libCat: idx }))}
+              className={`pill ${isSelected ? "on" : ""}`}
             >
-              <h3 className="font-semibold text-white">{t}</h3>
-              <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400"
-                  style={{ width: `${(count / 6) * 100}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-slate-400">
-                <span>Sample Set: {count} / 6</span>
-                {count >= 6 && (
-                  <span className="text-emerald-400 font-medium">
-                    Completed
-                  </span>
-                )}
+              <span style={{ marginRight: "6px" }}>{icon}</span>
+              <span>{catName}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Subtopics Grid */}
+      <div className="grid lib">
+        {subtopics.map(([subtopicName, lessons]) => {
+          const completedInTopic = lessons.filter(
+            (l) => state.lib?.[`${currentCategoryName}|${subtopicName}|${l}`],
+          ).length;
+          const percentage = Math.round(
+            (completedInTopic / lessons.length) * 100,
+          );
+
+          return (
+            <div key={subtopicName} className="card">
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <h3 style={{ margin: 0 }}>{subtopicName}</h3>
+                <span className="mu" style={{ fontSize: "12px" }}>
+                  {completedInTopic} / {lessons.length}
+                </span>
               </div>
 
-              {t in (state.videos || {}) && (
-                <div className="pt-2 border-t border-slate-800/80">
-                  {isVideoDone ? (
-                    <span className="text-xs text-emerald-400">
-                      ✓ Concept Video Completed
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handleWatchVideo(t)}
-                      className="rounded-lg border border-blue-500/30 px-3 py-1 text-xs text-cyan-300 hover:bg-blue-500/10"
+              <div className="bar" style={{ margin: "8px 0 12px" }}>
+                <i style={{ width: `${percentage}%` }} />
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px",
+                  maxHeight: "180px",
+                  overflowY: "auto",
+                  paddingRight: "4px",
+                }}
+              >
+                {lessons.map((lesson) => {
+                  const isChecked =
+                    !!state.lib?.[`${currentCategoryName}|${subtopicName}|${lesson}`];
+                  return (
+                    <label
+                      key={lesson}
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                        fontSize: "13px",
+                        cursor: "pointer",
+                      }}
                     >
-                      Watch Concept Video (1x - 1.5x)
-                    </button>
-                  )}
-                </div>
-              )}
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() =>
+                          handleLessonToggle(
+                            currentCategoryName,
+                            subtopicName,
+                            lesson,
+                          )
+                        }
+                      />
+                      <span
+                        style={{
+                          textDecoration: isChecked ? "line-through" : "none",
+                          opacity: isChecked ? 0.7 : 1,
+                        }}
+                      >
+                        {lesson}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: "12px" }}>
+                <button
+                  className="btn ghost"
+                  style={{ width: "100%", fontSize: "12px", padding: "6px" }}
+                  onClick={() => handleOpenVideo(subtopicName)}
+                >
+                  ▶ Video Walkthrough
+                </button>
+              </div>
             </div>
           );
         })}

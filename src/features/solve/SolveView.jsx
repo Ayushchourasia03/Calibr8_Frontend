@@ -1,17 +1,30 @@
 import { useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import { LANGS } from "../../constants";
-import { useStrictModeGuard } from "../../hooks/useStrictModeGuard";
+import { MonacoEditor } from "./MonacoEditor";
+import { LANGS, DIFFICULTY_LABELS } from "../../data/constants";
 
 export function SolveView() {
-  const { currentQ, state, setState, setView, getTopicRating } = useCalibr8();
-  const [selectedLang, setSelectedLang] = useState("JavaScript");
+  const {
+    currentQ,
+    state,
+    setState,
+    setActiveModal,
+    setModalData,
+    getTopicRating,
+    analyzeCode,
+    showToast,
+  } = useCalibr8();
+
+  const [selectedLang, setSelectedLang] = useState(state.lang || "Python3");
   const [showDryRun, setShowDryRun] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const [quizAnswer, setQuizAnswer] = useState("O(n)");
   const [quizResult, setQuizResult] = useState(null);
   const [resultData, setResultData] = useState(null);
 
   const attempt = state.att;
+  const isStrict = attempt?.mode === "strict";
+  const isLocked = attempt?.locked;
 
   const startMode = (mode) => {
     setState((s) => ({
@@ -22,8 +35,8 @@ export function SolveView() {
         hints: 0,
         locked: false,
         away: 0,
-        active: true
-      }
+        active: true,
+      },
     }));
 
     if (mode === "strict") {
@@ -32,35 +45,12 @@ export function SolveView() {
   };
 
   const handleAbandon = () => {
-    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
     setState((s) => ({ ...s, att: null }));
     setShowDryRun(false);
-  };
-
-  useStrictModeGuard({
-    isActive: Boolean(attempt?.active),
-    isStrict: attempt?.mode === "strict",
-    onAwayWarning: (sec) => {
-      setState((s) => {
-        if (!s.att) return s;
-        const awayCount = (s.att.away || 0) + 1;
-        if (awayCount >= 2) {
-          return { ...s, att: { ...s.att, locked: true, away: awayCount } };
-        }
-        alert(`Warning: You were away for ${Math.round(sec)} seconds. One more absence locks the question.`);
-        return { ...s, att: { ...s.att, away: awayCount } };
-      });
-    },
-    onLockout: () => {}
-  });
-
-  const handleUnlock = () => {
-    if (state.coins < 500) return alert("Unlocking requires 500 coins.");
-    setState((s) => ({
-      ...s,
-      coins: s.coins - 500,
-      att: { ...s.att, locked: false, away: 0 }
-    }));
+    setResultData(null);
   };
 
   const handleDryRun = () => {
@@ -71,46 +61,95 @@ export function SolveView() {
       setState((s) => ({ ...s, coins: s.coins - 20 }));
       setShowDryRun(true);
     } else {
-      alert("Not enough coins for dry run (20 needed).");
+      showToast("Not enough coins for dry run (20 needed).");
     }
+  };
+
+  const handleUnlock = () => {
+    if (state.coins < 500) {
+      showToast("Unlocking requires 500 coins.");
+      return;
+    }
+    setState((s) => ({
+      ...s,
+      coins: s.coins - 500,
+      att: { ...s.att, locked: false, away: 0 },
+    }));
+    showToast("Question unlocked!");
   };
 
   const handleSubmit = () => {
     const code = (attempt?.code || "").trim();
-    if (code.length < 10) return alert("Please write a complete solution.");
+    if (code.length < 10) {
+      showToast("Please write a complete solution before submitting.");
+      return;
+    }
 
-    const normalized = code.toLowerCase();
-    const passedTier = normalized.length < 25
-      ? 0
-      : /deque|monotonic/.test(normalized)
-      ? 3
-      : /sort|set|heap|map/.test(normalized)
-      ? 2
-      : 1;
+    // Static code analysis
+    let an;
+    try {
+      an = analyzeCode(code, selectedLang);
+    } catch {
+      an = null;
+    }
 
-    const share = [0, 0.3, 0.65, 1][passedTier];
+    let t;
+    let sm = 1;
+    let bonus = 0;
+
+    if (an) {
+      const ct = an.exp ? 100 : an.time[0] * 10 + an.time[1];
+      const targetTime = 10;
+      const g = ct - targetTime;
+      const sg = an.space - 1;
+      const sus = g < -10;
+      t = !an.ok ? 0 : sus ? 1 : g <= 0 ? 3 : g <= 5 ? 2 : 1;
+      sm = sg <= 0 ? 1 : sg <= 0.5 ? 0.95 : sg <= 1 ? 0.9 : 0.8;
+      bonus = t === 3 && sg <= 0 ? 10 : 0;
+    } else {
+      const c = code.toLowerCase();
+      t =
+        code.length < 25
+          ? 0
+          : /deque|monotonic/.test(c)
+            ? 3
+            : /sort|set|heap|map/.test(c)
+              ? 2
+              : 1;
+    }
+
+    const share = [0, 0.3, 0.65, 1][t];
     const mult = attempt.mode === "strict" ? 1.5 : 1.0;
-    const pen = attempt.mode === "strict" ? 0 : [0, 0.05, 0.15, 0.35][attempt.hints || 0];
+    const pen =
+      attempt.mode === "strict"
+        ? 0
+        : [0, 0.05, 0.15, 0.35][attempt.hints || 0];
 
-    const awardedPts = Math.max(0, Math.round((currentQ.pts * share * mult - pen * currentQ.pts) * 10) / 10);
-    const earnedCoins = Math.round(awardedPts * 2);
-
+    const awardedPts = Math.max(
+      0,
+      Math.round((currentQ.pts * share * sm * mult - pen * currentQ.pts) * 10) /
+        10,
+    );
     const prevBest = state.best?.[currentQ.key] || 0;
     const delta = Math.max(0, Math.round((awardedPts - prevBest) * 10) / 10);
+    const earnedCoins = Math.round(delta * 2) + (delta > 0 ? bonus : 0);
 
-    // Rating calculations
+    // Rating adjustment
     const r0 = getTopicRating(currentQ.topic);
     const expected = 1 / (1 + Math.pow(10, (currentQ.d - r0) / 400));
-    const scoreVal = [0, 0.4, 0.7, 1.0][passedTier];
+    const scoreVal = [0, 0.4, 0.7, 1.0][t];
     const K = (state.solves || 0) < 10 ? 60 : 32;
     const nextRating = Math.round(r0 + K * (scoreVal - expected));
 
-    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
 
     setState((s) => {
       const nextSolves = (s.solves || 0) + 1;
       const nextScore = s.score + Math.round(delta * 10);
-      const isCalibrated = s.calibrating && nextSolves >= 10 && nextScore >= 1500;
+      const isCalibrated =
+        s.calibrating && nextSolves >= 10 && nextScore >= 1500;
 
       return {
         ...s,
@@ -123,249 +162,375 @@ export function SolveView() {
         best: { ...s.best, [currentQ.key]: Math.max(prevBest, awardedPts) },
         dailyDone: !currentQ.stretch ? true : s.dailyDone,
         stretchN: currentQ.stretch ? (s.stretchN || 0) + 1 : s.stretchN,
-        att: null
+        att: null,
       };
     });
 
     setResultData({
-      tier: passedTier,
+      tier: t,
       pts: delta,
       coins: earnedCoins,
-      mode: attempt.mode
+      mode: attempt.mode,
+      analysis: an,
+      bonus,
     });
   };
 
+  const handleQuizSubmit = () => {
+    if (quizAnswer === "O(n)") {
+      setQuizResult({
+        correct: true,
+        text: "Correct! The sliding window solution runs in linear O(n) time.",
+      });
+      setState((s) => ({ ...s, coins: s.coins + 15 }));
+    } else {
+      setQuizResult({
+        correct: false,
+        text: "Not optimal. A two-pointer sliding window achieves O(n).",
+      });
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      {/* Top Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
         <div>
-          <h1 className="text-2xl font-serif font-bold text-white">{currentQ.title}</h1>
-          <p className="text-xs text-slate-400">
-            {currentQ.topic} • {currentQ.pts} Base Points
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <h1>{currentQ.title}</h1>
+            <span className={`dc d${["E", "M", "H"][currentQ.difficulty || 0]}`}>
+              {DIFFICULTY_LABELS[currentQ.difficulty || 0]}
+            </span>
+          </div>
+          <div className="mu" style={{ marginTop: "4px" }}>
+            Topic: <b>{currentQ.topic}</b> • {currentQ.pts} Base Pts • Expected Time: {currentQ.expTime || "O(n)"}
+            {state.videos?.[currentQ.topic] ? (
+              <span className="ok" style={{ marginLeft: "10px" }}>✓ Concept Video Watched</span>
+            ) : (
+              <button
+                className="btn ghost"
+                style={{ marginLeft: "10px", padding: "2px 8px", fontSize: "11px" }}
+                onClick={() => {
+                  setActiveModal("video");
+                  setModalData({ topic: currentQ.topic });
+                }}
+              >
+                🎬 Concept Video
+              </button>
+            )}
+          </div>
         </div>
-        {attempt && (
+
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <button
-            onClick={handleAbandon}
-            className="rounded-full border border-red-500/40 px-3 py-1 text-xs text-red-400 hover:bg-red-500/10"
+            className="btn ghost"
+            style={{ fontSize: "12px" }}
+            onClick={() => setShowNotes(!showNotes)}
           >
-            Abandon Attempt
+            📝 {showNotes ? "Hide Notes" : "Private Notes"}
           </button>
-        )}
+          {attempt && (
+            <button
+              className="btn ghost"
+              style={{ fontSize: "12px", color: "var(--bad)", borderColor: "var(--bad)" }}
+              onClick={handleAbandon}
+            >
+              Abandon Attempt
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left Column: Problem & Hints */}
-        <div className="space-y-4 lg:col-span-5">
-          <div className="rounded-2xl border border-blue-500/20 bg-slate-900/60 p-5 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold text-white mb-2">Problem Statement</h2>
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">{currentQ.text}</p>
-            <div className="rounded-lg bg-black/40 p-3 font-mono text-xs text-cyan-300 border border-white/5">
-              {currentQ.ex}
-            </div>
+      {/* Main Grid: Problem Statement + Coding Arena */}
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px", alignItems: "start" }}>
+        {/* Left Card: Problem Statement & Hints */}
+        <div className="card">
+          <h2>Problem Statement</h2>
+          <p style={{ margin: "8px 0 14px", lineHeight: "1.6" }}>
+            {currentQ.text}
+          </p>
+
+          <div style={{ padding: "10px", background: "var(--cf)", borderRadius: "8px", border: "1px solid var(--ln)", marginBottom: "14px", fontFamily: "monospace", fontSize: "13px" }}>
+            <div className="mu" style={{ marginBottom: "4px" }}>Example:</div>
+            <div>{currentQ.ex}</div>
           </div>
 
+          <div className="mu" style={{ fontSize: "13px", marginBottom: "14px" }}>
+            Target: <b>{currentQ.expTime || "O(n)"}</b> time, <b>{currentQ.expSpace || "O(1)"}</b> space.
+          </div>
+
+          {/* Mode Selector when not yet started */}
           {!attempt ? (
-            <div className="rounded-2xl border border-blue-500/20 bg-slate-900/60 p-5 text-center">
-              <h3 className="text-sm font-medium text-white mb-2">Choose Mode</h3>
-              <p className="text-xs text-slate-400 mb-4">
-                Relaxed allows dry runs and paste. Strict runs fullscreen with anti-cheat for 1.5x score.
+            <div style={{ padding: "14px", background: "var(--cf)", borderRadius: "14px", border: "1px solid var(--ln)", textAlign: "center" }}>
+              <h3>Select Practice Mode</h3>
+              <p className="mu" style={{ fontSize: "13px", margin: "6px 0 14px" }}>
+                Choose between verified fullscreen practice or flexible learning.
               </p>
-              <div className="flex justify-center gap-3">
+              <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
                 <button
-                  onClick={() => startMode("relaxed")}
-                  className="rounded-full border border-slate-600 px-4 py-2 text-xs text-slate-200 hover:bg-white/5"
+                  className="btn"
+                  onClick={() => startMode("strict")}
                 >
-                  Start Relaxed (1.0x)
+                  Strict Mode (1.5× Pts, Fullscreen) 🔥
                 </button>
                 <button
-                  onClick={() => startMode("strict")}
-                  className="rounded-full bg-gradient-to-r from-blue-600 to-cyan-400 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/25"
+                  className="btn ghost"
+                  onClick={() => startMode("normal")}
                 >
-                  Start Strict (1.5x)
+                  Standard Practice Mode
                 </button>
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-blue-500/20 bg-slate-900/60 p-5 space-y-4">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-cyan-400 uppercase tracking-wider">
-                  Mode: {attempt.mode}
-                </span>
-                {attempt.mode === "relaxed" && (
-                  <button
-                    onClick={handleDryRun}
-                    className="rounded-lg bg-blue-600/20 border border-blue-500/40 px-3 py-1 text-cyan-300 hover:bg-blue-600/30"
-                  >
-                    Dry Run ({state.freeDry > 0 ? `${state.freeDry} Free` : "20 coins"})
-                  </button>
-                )}
-              </div>
-
-              {attempt.locked && (
-                <div className="rounded-lg bg-red-900/30 border border-red-500/40 p-3 text-xs text-red-200 flex items-center justify-between">
-                  <span>Question locked after away violations.</span>
-                  <button
-                    onClick={handleUnlock}
-                    className="rounded bg-red-600 px-2.5 py-1 font-semibold text-white text-[11px]"
-                  >
-                    Unlock (500 Coins)
-                  </button>
-                </div>
-              )}
-
-              {attempt.mode === "relaxed" && (
-                <div className="space-y-2">
-                  <div className="text-xs text-slate-400">Hints:</div>
-                  <div className="flex gap-2">
-                    {[0, 1, 2].map((i) => (
-                      <button
-                        key={i}
-                        disabled={attempt.hints > i}
-                        onClick={() =>
+            <div>
+              {/* Hints dropdown */}
+              {!isStrict && currentQ.hints && currentQ.hints.length > 0 && (
+                <div style={{ marginTop: "12px" }}>
+                  <h3>Hints & Guidance</h3>
+                  {currentQ.hints.map((hint, idx) => (
+                    <details
+                      key={idx}
+                      style={{
+                        padding: "8px",
+                        background: "var(--cf)",
+                        borderRadius: "8px",
+                        marginBottom: "6px",
+                        border: "1px solid var(--ln)",
+                      }}
+                      onToggle={(e) => {
+                        if (e.target.open) {
                           setState((s) => ({
                             ...s,
-                            att: { ...s.att, hints: i + 1 }
-                          }))
+                            att: {
+                              ...s.att,
+                              hints: Math.max(s.att?.hints || 0, idx + 1),
+                            },
+                          }));
                         }
-                        className="rounded border border-slate-700 bg-black/30 px-2.5 py-1 text-[11px] text-slate-300 disabled:opacity-40"
-                      >
-                        Hint {i + 1}
-                      </button>
-                    ))}
-                  </div>
-                  {currentQ.hints.slice(0, attempt.hints).map((h, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg border border-cyan-500/20 bg-cyan-950/20 p-2.5 text-xs text-cyan-200"
+                      }}
                     >
-                      Hint {i + 1}: {h}
-                    </div>
+                      <summary style={{ fontWeight: 600, fontSize: "13px" }}>
+                        Hint {idx + 1}
+                      </summary>
+                      <div className="mu" style={{ marginTop: "6px", fontSize: "13px" }}>
+                        {hint}
+                      </div>
+                    </details>
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </div>
 
+        {/* Right Card: Monaco Coding Arena */}
+        <div className="card">
+          {isStrict && (
+            <div className="banner" style={{ borderLeft: "3px solid var(--bad)", marginBottom: "10px" }}>
+              <b>Strict Mode Active:</b> Fullscreen enabled. Tab switching or pasting will flag the attempt.
+            </div>
+          )}
+
+          {isLocked ? (
+            <div style={{ textAlign: "center", padding: "40px 10px" }}>
+              <h2 className="bad">Attempt Locked</h2>
+              <p className="mu">
+                You navigated away during strict mode. Question locked.
+              </p>
+              <button className="btn" onClick={handleUnlock}>
+                Unlock Question (500 Coins)
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div className="row" style={{ justifyContent: "space-between", marginBottom: "8px" }}>
+                <select
+                  value={selectedLang}
+                  onChange={(e) => {
+                    setSelectedLang(e.target.value);
+                    setState((s) => ({ ...s, lang: e.target.value }));
+                  }}
+                  disabled={!attempt}
+                >
+                  {LANGS.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    className="btn ghost"
+                    disabled={!attempt}
+                    onClick={handleDryRun}
+                  >
+                    Dry Run ({state.freeDry > 0 ? `${state.freeDry} free` : "20 coins"})
+                  </button>
+                  <button
+                    className="btn"
+                    disabled={!attempt}
+                    onClick={handleSubmit}
+                  >
+                    Submit Code →
+                  </button>
+                </div>
+              </div>
+
+              {/* Monaco Editor Mount */}
+              <MonacoEditor
+                language={selectedLang}
+                value={attempt ? attempt.code : "# Click 'Start Practice' to begin coding\n"}
+                onChange={(val) => {
+                  if (attempt) {
+                    setState((s) => ({
+                      ...s,
+                      att: { ...s.att, code: val },
+                    }));
+                  }
+                }}
+                readOnly={!attempt}
+                isStrictMode={isStrict}
+                onPasteBlocked={() => {
+                  showToast("Pasting is disabled in Strict Mode!");
+                }}
+              />
+
+              {/* Dry Run Test Case Output */}
               {showDryRun && (
-                <div className="overflow-x-auto rounded-lg border border-slate-800 bg-black/60 p-2">
-                  <table className="w-full text-left text-[11px] text-slate-300">
+                <div style={{ marginTop: "14px", padding: "12px", background: "var(--cf)", borderRadius: "10px", border: "1px solid var(--ln)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <b>Dry Run Test Results</b>
+                    <span className="ok">✓ All Test Cases Passed (Mock Engine)</span>
+                  </div>
+                  <table>
                     <thead>
-                      <tr className="border-b border-slate-800 text-slate-500">
-                        <th className="p-1">Step</th>
-                        <th className="p-1">Window</th>
-                        <th className="p-1">Max</th>
-                        <th className="p-1">Min</th>
-                        <th className="p-1">Best</th>
+                      <tr>
+                        <th>Test Case</th>
+                        <th>Input</th>
+                        <th>Expected</th>
+                        <th>Actual</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {currentQ.trace.map((r, i) => (
-                        <tr key={i} className="border-b border-slate-900">
-                          <td className="p-1 font-mono text-cyan-400">{r[0]}</td>
-                          <td className="p-1">{r[1]}</td>
-                          <td className="p-1">{r[2]}</td>
-                          <td className="p-1">{r[3]}</td>
-                          <td className="p-1 font-semibold text-white">{r[4]}</td>
-                        </tr>
-                      ))}
+                      <tr>
+                        <td>Case 1</td>
+                        <td>[2, 7, 11, 15], 9</td>
+                        <td>[0, 1]</td>
+                        <td className="ok">[0, 1]</td>
+                      </tr>
+                      <tr>
+                        <td>Case 2</td>
+                        <td>[3, 2, 4], 6</td>
+                        <td>[1, 2]</td>
+                        <td className="ok">[1, 2]</td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
           )}
-        </div>
 
-        {/* Right Column: Code Editor */}
-        <div className="space-y-4 lg:col-span-7">
-          <div className="rounded-2xl border border-blue-500/20 bg-slate-900/60 p-5 backdrop-blur-xl">
-            <div className="flex items-center justify-between pb-3">
-              <label className="text-xs text-slate-400 flex items-center gap-2">
-                Language:
-                <select
-                  value={selectedLang}
-                  onChange={(e) => setSelectedLang(e.target.value)}
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white"
-                >
-                  {LANGS.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <button
-                disabled={!attempt || attempt.locked}
-                onClick={handleSubmit}
-                className="rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-1.5 text-xs font-semibold text-white shadow-lg disabled:opacity-40"
-              >
-                Submit Code
-              </button>
-            </div>
-
-            <textarea
-              rows={14}
-              disabled={!attempt || attempt.locked}
-              value={attempt?.code || ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                setState((s) => ({
-                  ...s,
-                  att: { ...s.att, code: val }
-                }));
-              }}
-              placeholder={attempt ? "// Write your solution here..." : "// Start an attempt to begin coding..."}
-              className="w-full rounded-xl border border-slate-800 bg-[#02060f] p-4 font-mono text-xs text-slate-200 outline-none focus:border-cyan-500/50"
-            />
-          </div>
-
+          {/* Submission Result Banner */}
           {resultData && (
-            <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5 text-white space-y-4 animate-fadeIn">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-cyan-300">
-                  {resultData.tier === 0
-                    ? "Incomplete Solution"
-                    : `Passed Tier ${resultData.tier}: ${["", "Brute Force", "Better Solution", "Optimal"][resultData.tier]}`}
-                </span>
-                <span className="text-xs text-slate-400">
-                  +{resultData.pts} pts • +{resultData.coins} coins
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs">
-                <span>Estimated Time Complexity:</span>
-                <select
-                  value={quizAnswer}
-                  onChange={(e) => setQuizAnswer(e.target.value)}
-                  className="rounded bg-black border border-slate-700 px-2 py-1 text-white"
-                >
-                  <option value="O(n^2)">O(n^2)</option>
-                  <option value="O(n log n)">O(n log n)</option>
-                  <option value="O(n)">O(n)</option>
-                </select>
-                <button
-                  onClick={() => {
-                    const isOptimal = quizAnswer === (resultData.tier === 3 ? "O(n)" : "O(n^2)");
-                    setQuizResult(isOptimal ? "Correct! +2 bonus points" : "Not quite");
-                    if (isOptimal) setState((s) => ({ ...s, score: s.score + 20 }));
-                  }}
-                  className="rounded border border-blue-400/40 px-2 py-1 text-cyan-300"
-                >
-                  Verify
-                </button>
-                {quizResult && <span className="text-cyan-400">{quizResult}</span>}
-              </div>
-
-              <button
-                onClick={() => setView("home")}
-                className="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white"
-              >
-                Return to Dashboard
-              </button>
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "16px",
+                borderRadius: "12px",
+                background: resultData.tier > 0 ? "rgba(46, 212, 122, 0.15)" : "rgba(255, 92, 122, 0.15)",
+                border: `1px solid ${resultData.tier > 0 ? "#2ED47A" : "#FF5C7A"}`,
+              }}
+            >
+              <h3>
+                {resultData.tier === 3
+                  ? "🎉 Optimal Solution Accepted!"
+                  : resultData.tier === 2
+                    ? "✓ Solution Accepted (Sub-optimal Complexity)"
+                    : resultData.tier === 1
+                      ? "⚠️ Solution Passed with High Complexity"
+                      : "❌ Incomplete or Syntax Error"}
+              </h3>
+              <p className="mu" style={{ margin: "6px 0 10px" }}>
+                Awarded: <b>+{resultData.pts} Pts</b> • Earned: <b>+{resultData.coins} Coins</b>
+                {resultData.bonus > 0 && " (Includes 10 coin optimal bonus!)"}
+              </p>
+              {resultData.analysis && (
+                <div style={{ fontSize: "12px" }}>
+                  Analyzed Complexity: Time {resultData.analysis.time[0] === 1 ? "O(n)" : resultData.analysis.time[0] === 2 ? "O(n²)" : "O(1)"} • Space {resultData.analysis.space === 1 ? "O(1)" : "O(n)"}
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Complexity Quiz Card */}
+      <div className="card" style={{ marginTop: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2>Complexity Prediction Quiz</h2>
+          <span className="tag">+15 Coins</span>
+        </div>
+        <p className="mu" style={{ margin: "4px 0 10px" }}>
+          What is the tightest time complexity achievable for this problem?
+        </p>
+
+        <div className="row">
+          <select
+            value={quizAnswer}
+            onChange={(e) => setQuizAnswer(e.target.value)}
+          >
+            <option value="O(1)">O(1) Constant</option>
+            <option value="O(log n)">O(log n) Logarithmic</option>
+            <option value="O(n)">O(n) Linear</option>
+            <option value="O(n log n)">O(n log n) Linearithmic</option>
+            <option value="O(n²)">O(n²) Quadratic</option>
+          </select>
+          <button className="btn" onClick={handleQuizSubmit}>
+            Check Answer
+          </button>
+          {quizResult && (
+            <span
+              className={quizResult.correct ? "ok" : "bad"}
+              style={{ fontWeight: 600, fontSize: "13px" }}
+            >
+              {quizResult.text}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Private Notes Drawer */}
+      {showNotes && (
+        <div className="card ndrawer">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <h3>Private Notes</h3>
+            <button
+              className="x"
+              style={{ position: "static", width: "26px", height: "26px", fontSize: "16px" }}
+              onClick={() => setShowNotes(false)}
+            >
+              ×
+            </button>
+          </div>
+          <p className="mu" style={{ fontSize: "12px", margin: "2px 0 8px" }}>
+            Notes are auto-saved locally for this problem.
+          </p>
+          <textarea
+            value={state.notes?.[currentQ.key] || ""}
+            placeholder="Write your approach, edge cases, recurrence relations..."
+            style={{ minHeight: "140px" }}
+            onChange={(e) => {
+              const val = e.target.value;
+              setState((s) => ({
+                ...s,
+                notes: { ...s.notes, [currentQ.key]: val },
+              }));
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

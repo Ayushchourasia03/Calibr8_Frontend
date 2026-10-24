@@ -1,109 +1,167 @@
+import { useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-
-const CATEGORIES = [
-  "Global",
-  "India",
-  "State",
-  "College",
-  "Branch",
-  "Batch",
-  "Friends",
-];
+import { PEER_RANKINGS, RANKING_CATEGORIES } from "../../data/rankingsData";
+import { getTierForRating } from "../../utils/tierUtils";
 
 export function RankingsView() {
-  const { state, setState, getTier } = useCalibr8();
+  const { state } = useCalibr8();
+  const [activeBoard, setActiveBoard] = useState(state.board || "College");
 
-  const mockUsers = [
-    {
-      name: "Riya Verma",
-      tier: "Nova",
-      rating: 1912,
-      score: 48210,
-      strict: "88%",
-    },
-    {
-      name: "Kabir Singh",
-      tier: "Nova",
-      rating: 1874,
-      score: 46950,
-      strict: "74%",
-    },
-    {
-      name: "Ananya Gupta",
-      tier: "Flame",
-      rating: 1790,
-      score: 44120,
-      strict: "91%",
-    },
-    {
-      name: "You",
-      tier: getTier(),
-      rating: state.rating,
-      score: state.score,
-      strict: "95%",
-    },
-    {
-      name: "Sneha Rao",
-      tier: "Flame",
-      rating: 1702,
-      score: 39870,
-      strict: "67%",
-    },
-  ].sort((a, b) => b.score - a.score);
+  const myName =
+    state.name ||
+    (state.user && !state.user.guest
+      ? state.user.email?.split("@")[0]
+      : "You");
+
+  const me = {
+    name: myName,
+    avatar: state.avatar || "🙂",
+    rating: state.rating || 1630,
+    score: state.score || 890,
+    streak: state.streak || 46,
+    strictPct: "95%",
+    isMe: true,
+  };
+
+  const rows = PEER_RANKINGS.map((p) => ({
+    name: p[0],
+    avatar: p[1],
+    rating: p[2],
+    score: p[3],
+    streak: p[4],
+    strictPct: `${p[5]}%`,
+    isMe: false,
+  }))
+    .concat([me])
+    .sort((a, b) => b.score - a.score);
+
+  // Top 3 Podium
+  const pRank1 = rows[0];
+  const pRank2 = rows[1] || rows[0];
+  const pRank3 = rows[2] || rows[0];
+
+  const t1 = getTierForRating(pRank1.rating);
+  const t2 = getTierForRating(pRank2.rating);
+  const t3 = getTierForRating(pRank3.rating);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-serif font-bold text-white">Rankings</h1>
-        <p className="text-xs text-slate-400">
-          Rankings are calculated via strict-mode verified submissions.
+    <div>
+      <div style={{ marginBottom: "12px" }}>
+        <h1>Calibr8 Leaderboard</h1>
+        <p className="mu" style={{ margin: "4px 0" }}>
+          Strict-mode verified rankings. Rating shows raw skill calibration; score shows cumulative deliberate practice.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((cat) => (
+      <div className="row">
+        {RANKING_CATEGORIES.map((category) => (
           <button
-            key={cat}
-            onClick={() => setState((s) => ({ ...s, board: cat }))}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
-              state.board === cat
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
-                : "border border-slate-700 bg-slate-900/40 text-slate-400 hover:text-white"
-            }`}
+            key={category}
+            onClick={() => setActiveBoard(category)}
+            className={`pill ${activeBoard === category ? "on" : ""}`}
           >
-            {cat}
+            {category}
           </button>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-blue-500/20 bg-slate-900/50 backdrop-blur-xl">
-        <table className="w-full text-left text-xs text-slate-300">
-          <thead className="border-b border-slate-800 text-slate-400">
+      {/* Top 3 Podium */}
+      <div className="pod">
+        {/* Rank 2 - Silver */}
+        <div className="card">
+          <div style={{ fontSize: "24px", marginBottom: "4px" }}>🥈</div>
+          <div className="av" style={{ margin: "0 auto 8px" }}>
+            {pRank2.avatar}
+          </div>
+          <h3 style={{ margin: "4px 0" }}>
+            {pRank2.name} {pRank2.isMe && "(You)"}
+          </h3>
+          <span className="tbg" style={{ "--tc": t2.color, marginBottom: "4px" }}>
+            {t2.full}
+          </span>
+          <div className="mu" style={{ fontSize: "12px", marginTop: "4px" }}>
+            <b>{pRank2.score}</b> pts • {pRank2.rating} ELO
+          </div>
+        </div>
+
+        {/* Rank 1 - Gold (Elevated) */}
+        <div className="card" style={{ paddingBottom: "24px" }}>
+          <div style={{ fontSize: "32px", marginBottom: "4px" }}>🥇</div>
+          <div className="av" style={{ margin: "0 auto 8px" }}>
+            {pRank1.avatar}
+          </div>
+          <h3 style={{ margin: "4px 0" }}>
+            {pRank1.name} {pRank1.isMe && "(You)"}
+          </h3>
+          <span className="tbg" style={{ "--tc": t1.color, marginBottom: "4px" }}>
+            {t1.full}
+          </span>
+          <div className="mu" style={{ fontSize: "13px", marginTop: "4px" }}>
+            <b>{pRank1.score}</b> pts • {pRank1.rating} ELO
+          </div>
+        </div>
+
+        {/* Rank 3 - Bronze */}
+        <div className="card">
+          <div style={{ fontSize: "24px", marginBottom: "4px" }}>🥉</div>
+          <div className="av" style={{ margin: "0 auto 8px" }}>
+            {pRank3.avatar}
+          </div>
+          <h3 style={{ margin: "4px 0" }}>
+            {pRank3.name} {pRank3.isMe && "(You)"}
+          </h3>
+          <span className="tbg" style={{ "--tc": t3.color, marginBottom: "4px" }}>
+            {t3.full}
+          </span>
+          <div className="mu" style={{ fontSize: "12px", marginTop: "4px" }}>
+            <b>{pRank3.score}</b> pts • {pRank3.rating} ELO
+          </div>
+        </div>
+      </div>
+
+      {/* Leaderboard Table */}
+      <div className="card">
+        <table>
+          <thead>
             <tr>
-              <th className="p-3">#</th>
-              <th className="p-3">Name</th>
-              <th className="p-3">Tier</th>
-              <th className="p-3">Rating</th>
-              <th className="p-3">Score</th>
-              <th className="p-3">Strict Rate</th>
+              <th style={{ width: "50px" }}>Rank</th>
+              <th>Learner</th>
+              <th>Tier</th>
+              <th>Rating</th>
+              <th>Streak</th>
+              <th>Strict</th>
+              <th style={{ textAlign: "right" }}>Score</th>
             </tr>
           </thead>
           <tbody>
-            {mockUsers.map((u, i) => {
-              const isMe = u.name === "You";
+            {rows.map((row, idx) => {
+              const tier = getTierForRating(row.rating);
+              const rankNum = idx + 1;
               return (
-                <tr
-                  key={u.name}
-                  className={`border-b border-slate-900/80 ${
-                    isMe ? "bg-blue-600/10 font-semibold text-cyan-300" : ""
-                  }`}
-                >
-                  <td className="p-3">{i + 1}</td>
-                  <td className="p-3">{u.name}</td>
-                  <td className="p-3">{u.tier}</td>
-                  <td className="p-3">{u.rating}</td>
-                  <td className="p-3">{u.score.toLocaleString()}</td>
-                  <td className="p-3">{u.strict}</td>
+                <tr key={idx} className={row.isMe ? "me" : ""}>
+                  <td className="mu">#{rankNum}</td>
+                  <td>
+                    <span className="av sm" style={{ marginRight: "8px" }}>
+                      {row.avatar}
+                    </span>
+                    <b>{row.name}</b>
+                    {row.isMe && (
+                      <span className="tag" style={{ marginLeft: "8px", fontSize: "10px" }}>
+                        You
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <span className="tbg" style={{ "--tc": tier.color }}>
+                      {tier.full}
+                    </span>
+                  </td>
+                  <td><b>{row.rating}</b></td>
+                  <td className="mu">🔥 {row.streak}d</td>
+                  <td className="mu">{row.strictPct}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <b>{row.score}</b>
+                  </td>
                 </tr>
               );
             })}

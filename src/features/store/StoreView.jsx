@@ -1,103 +1,214 @@
 import { useCalibr8 } from "../../context/Calibr8Context";
-
-const THEMES = [
-  { id: "default", name: "Default Sapphire", cost: 0 },
-  { id: "pixel", name: "Pixel World", cost: 300 },
-  { id: "neon", name: "Neon Tactical", cost: 450 },
-  { id: "race", name: "Racing Dashboard", cost: 600 },
-];
+import { SKINS } from "../../data/themesData";
 
 export function StoreView() {
-  const { state, setState } = useCalibr8();
+  const {
+    state,
+    setState,
+    previewSkinId,
+    setPreviewSkinId,
+    buyOrApplySkin,
+    showToast,
+  } = useCalibr8();
 
-  const buyTheme = (theme) => {
-    if (state.owned.includes(theme.id)) {
-      setState((s) => ({ ...s, theme: theme.id }));
+  const ownedSkins = state.ownedSkins || ["default"];
+  const currentSkin = state.skin || "default";
+
+  const handleBuyDryRuns = () => {
+    if (state.coins < 80) {
+      showToast("Not enough coins! 5 dry runs require 80 coins.");
       return;
     }
-
-    if (state.coins < theme.cost) {
-      alert("Not enough coins to acquire this theme.");
-      return;
-    }
-
-    setState((s) => ({
-      ...s,
-      coins: s.coins - theme.cost,
-      owned: [...s.owned, theme.id],
-      theme: theme.id,
-    }));
-  };
-
-  const buyDryRuns = () => {
-    if (state.coins < 80) return alert("Requires 80 coins for a 5-pack.");
     setState((s) => ({
       ...s,
       coins: s.coins - 80,
-      freeDry: s.freeDry + 5,
+      freeDry: (s.freeDry || 0) + 5,
     }));
+    showToast("Purchased 5 dry runs for 80 coins!");
+  };
+
+  // Theme preview styling variables
+  const getSkinVariables = (skinId) => {
+    switch (skinId) {
+      case "orbit":
+        return {
+          "--pb": "#031a22",
+          "--pc": "#062a36",
+          "--pf": "#35E6FF",
+          "--pa": "#35E6FF",
+          "--pr": "4px",
+          "--pfont": "system-ui",
+        };
+      case "frost":
+        return {
+          "--pb": "#EEF0FA",
+          "--pc": "#FFFFFF",
+          "--pf": "#14152B",
+          "--pa": "#12132A",
+          "--pr": "18px",
+          "--pfont": "system-ui",
+        };
+      case "editorial":
+        return {
+          "--pb": "#F7F4EE",
+          "--pc": "#FBF9F4",
+          "--pf": "#14120F",
+          "--pa": "#14120F",
+          "--pr": "14px",
+          "--pfont": "Newsreader, Georgia, serif",
+        };
+      case "mono":
+        return {
+          "--pb": "#0A0A0A",
+          "--pc": "#141414",
+          "--pf": "#FFFFFF",
+          "--pa": "#FFFFFF",
+          "--pr": "0px",
+          "--pfont": "Impact, sans-serif",
+        };
+      case "pearl":
+        return {
+          "--pb": "#ECECEE",
+          "--pc": "#FFFFFF",
+          "--pf": "#0E0E10",
+          "--pa": "#111111",
+          "--pr": "20px",
+          "--pfont": "Newsreader, Georgia, serif",
+        };
+      case "arcade":
+        return {
+          "--pb": "#0B0620",
+          "--pc": "#150C33",
+          "--pf": "#00FFC6",
+          "--pa": "#FF2E97",
+          "--pr": "3px",
+          "--pfont": "Orbitron, system-ui",
+        };
+      case "racer":
+        return {
+          "--pb": "#0B0B0D",
+          "--pc": "#17171B",
+          "--pf": "#FF1E1E",
+          "--pa": "#FF1E1E",
+          "--pr": "2px",
+          "--pfont": "Impact, sans-serif",
+        };
+      default:
+        return {
+          "--pb": "#000511",
+          "--pc": "rgba(8, 16, 34, 0.72)",
+          "--pf": "#7CC0FF",
+          "--pa": "#2F8BFF",
+          "--pr": "14px",
+          "--pfont": "system-ui",
+        };
+    }
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-serif font-bold text-white">Store</h1>
-        <p className="text-xs text-slate-400">
-          Coins are earned strictly through coding. Money never buys rank or
-          ratings.
+    <div>
+      <div style={{ marginBottom: "14px" }}>
+        <h1>Calibr8 Themes & Store</h1>
+        <p className="mu" style={{ margin: "4px 0" }}>
+          Themes transform the design archetype: typography, borders, glow, and layout. Preview any skin for free, then purchase with earned coins.
         </p>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {THEMES.map((th) => {
-          const isOwned = state.owned.includes(th.id);
-          const isApplied = state.theme === th.id;
+      {/* Floating Preview Bar */}
+      {previewSkinId && (
+        <div id="pvbar">
+          <span>
+            Previewing: <b>{SKINS[previewSkinId]?.name}</b>
+          </span>
+          <button
+            className="btn"
+            style={{ padding: "6px 14px", fontSize: "12px" }}
+            onClick={() => buyOrApplySkin(previewSkinId)}
+          >
+            {ownedSkins.includes(previewSkinId)
+              ? "Apply Theme"
+              : `Buy for ${SKINS[previewSkinId]?.price} coins`}
+          </button>
+          <button
+            className="btn ghost"
+            style={{ padding: "6px 14px", fontSize: "12px" }}
+            onClick={() => setPreviewSkinId(null)}
+          >
+            Exit Preview
+          </button>
+        </div>
+      )}
+
+      {/* Power-ups banner */}
+      <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
+        <div>
+          <h3>Dry Run Compilations</h3>
+          <p className="mu" style={{ margin: 0, fontSize: "13px" }}>
+            You have <b>{state.freeDry || 0}</b> free dry runs remaining • Balance: <b>{state.coins || 0}</b> coins
+          </p>
+        </div>
+        <button
+          className="btn"
+          style={{ fontSize: "12px" }}
+          onClick={handleBuyDryRuns}
+        >
+          Buy 5 Dry Runs (80 Coins)
+        </button>
+      </div>
+
+      {/* Themes Grid */}
+      <div className="grid">
+        {Object.values(SKINS).map((skin) => {
+          const isOwned = ownedSkins.includes(skin.id);
+          const isApplied = currentSkin === skin.id && !previewSkinId;
+          const isPreviewing = previewSkinId === skin.id;
+          const skinVars = getSkinVariables(skin.id);
+
           return (
-            <div
-              key={th.id}
-              className="rounded-2xl border border-blue-500/20 bg-slate-900/50 p-5 backdrop-blur-xl flex flex-col justify-between"
-            >
-              <div>
-                <h3 className="font-semibold text-white mb-1">{th.name}</h3>
-                <p className="text-xs text-slate-400 mb-4">
-                  Cosmetic interface styling & ambiance.
-                </p>
+            <div key={skin.id} className="card">
+              {/* Mini theme preview box */}
+              <div className="pv" style={skinVars}>
+                <b>Aa {skin.name}</b>
+                <i />
+                <u>Button</u>
               </div>
 
-              <button
-                onClick={() => buyTheme(th)}
-                className={`w-full rounded-full py-2 text-xs font-semibold transition ${
-                  isApplied
-                    ? "bg-slate-700 text-slate-300 cursor-default"
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "6px 0" }}>
+                <h3 style={{ margin: 0 }}>{skin.name}</h3>
+                <span className="mu" style={{ fontSize: "12px" }}>
+                  {skin.price === 0 ? "Free Default" : `${skin.price} Coins`}
+                </span>
+              </div>
+
+              <p className="mu" style={{ fontSize: "12px", minHeight: "36px", margin: "4px 0 10px" }}>
+                {skin.description}
+              </p>
+
+              <div className="row" style={{ marginTop: "auto", gap: "6px" }}>
+                <button
+                  className="btn ghost"
+                  style={{ flex: 1, fontSize: "12px", padding: "6px" }}
+                  onClick={() => setPreviewSkinId(skin.id)}
+                >
+                  {isPreviewing ? "Previewing" : "Preview"}
+                </button>
+
+                <button
+                  className={`btn ${isApplied ? "ghost" : ""}`}
+                  style={{ flex: 1, fontSize: "12px", padding: "6px" }}
+                  disabled={isApplied}
+                  onClick={() => buyOrApplySkin(skin.id)}
+                >
+                  {isApplied
+                    ? "Active ✓"
                     : isOwned
-                      ? "border border-cyan-400 text-cyan-300 hover:bg-cyan-500/10"
-                      : "bg-blue-600 text-white hover:bg-blue-500"
-                }`}
-              >
-                {isApplied
-                  ? "Applied"
-                  : isOwned
-                    ? "Apply Theme"
-                    : `Buy for ${th.cost} Coins`}
-              </button>
+                      ? "Apply"
+                      : `Unlock (${skin.price})`}
+                </button>
+              </div>
             </div>
           );
         })}
-
-        <div className="rounded-2xl border border-blue-500/20 bg-slate-900/50 p-5 backdrop-blur-xl flex flex-col justify-between">
-          <div>
-            <h3 className="font-semibold text-white mb-1">5x Dry Run Pack</h3>
-            <p className="text-xs text-slate-400 mb-4">
-              Get 5 visual stepper executions for relaxed mode.
-            </p>
-          </div>
-          <button
-            onClick={buyDryRuns}
-            className="w-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 py-2 text-xs font-semibold text-white"
-          >
-            Buy for 80 Coins
-          </button>
-        </div>
       </div>
     </div>
   );

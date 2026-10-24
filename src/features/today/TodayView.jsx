@@ -1,161 +1,342 @@
+import { useMemo } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import { TIERS, DIFFICULTY_LABELS } from "../../constants";
+import { VOCABULARY_WORDS } from "../../data/vocabularyData";
+import { todayKey, ymd } from "../../utils/tierUtils";
+import { DIFFICULTY_LABELS } from "../../data/constants";
 
 export function TodayView() {
   const {
     state,
-    getTier,
-    createQuestion,
-    setCurrentQ,
+    setState,
     setView,
-    setTopicLevel,
-    setLevelModalOpen,
+    setActiveModal,
+    setModalData,
+    tierInfo,
+    setCurrentQ,
+    createQuestion,
+    getTopicRating,
+    showToast,
   } = useCalibr8();
 
+  const now = useMemo(() => new Date(), []);
+  const h = now.getHours();
+  const greeting =
+    h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  const st = state.streak || 0;
+  const milestones = [7, 14, 30, 60, 100, 365];
+  const nextMilestone = milestones.find((x) => x > st) || 365;
+
+  const currentWordIndex = (state.dayStamp || 0) % VOCABULARY_WORDS.length;
+  const word = VOCABULARY_WORDS[currentWordIndex];
+  const isWordLearned = state.wordDay === todayKey();
+
+  // Monthly calendar generator
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const activity = state.activity || {};
+  const dailyDoneMap = state.dd || {};
+
+  let completedDaysCount = 0;
+  const calendarDays = [];
+  for (let i = 0; i < firstDay; i++) {
+    calendarDays.push({ empty: true, key: `empty_${i}` });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const k = ymd(year, month, d);
+    const count = activity[k] || 0;
+    const isDailyDoneOnDate = dailyDoneMap[k];
+    if (isDailyDoneOnDate) completedDaysCount++;
+    calendarDays.push({
+      day: d,
+      key: k,
+      count,
+      isDailyDone: isDailyDoneOnDate,
+      isToday: d === now.getDate(),
+    });
+  }
+
+  // Active question
   const dailyQ = state.daily || createQuestion(false);
   const stretchQ = state.stretch || createQuestion(true);
-  const gaugePct = Math.max(5, Math.min(95, ((state.rating - 700) % 200) / 2));
-  const topicsList = Object.keys(state.levels || {}).length > 0
-    ? Object.keys(state.levels)
-    : ["Arrays", "Sliding Window", "Graphs"];
 
   const handleOpenDaily = () => {
     setCurrentQ(dailyQ);
+    setState((s) => ({ ...s, att: null }));
     setView("solve");
   };
 
   const handleOpenStretch = () => {
     setCurrentQ(stretchQ);
+    setState((s) => ({ ...s, att: null }));
     setView("solve");
   };
 
+  const handleLearnWord = () => {
+    if (!isWordLearned) {
+      setState((s) => ({
+        ...s,
+        wordDay: todayKey(),
+        wordsLearned: (s.wordsLearned || 0) + 1,
+      }));
+      showToast(`Word learned: ${word[0]}!`);
+    }
+  };
+
+  const L = state.levels || {};
+  const topics = Object.keys(L);
+
+  const getTopicStatus = (t) => {
+    const r = getTopicRating(t);
+    const base = [800, 1200, 1600][L[t] || 0];
+    const diff = r - base;
+    if (diff >= 50) return { label: "Good", color: "ok" };
+    if (diff <= -50) return { label: "Weak", color: "bad" };
+    return { label: "Better", color: "mu" };
+  };
+
+  // Weekdays for current week streak
+  const dayOfWeek = now.getDay(); // 0 is Sun
+  const weekDays = ["S", "M", "T", "W", "T", "F", "S"];
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl md:text-3xl font-serif font-bold text-white">
-        Your Day
-      </h1>
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "8px" }}>
+        <h1>
+          {greeting},{" "}
+          {state.name || (state.user && !state.user.guest ? state.user.email?.split("@")[0] : "Learner")}
+        </h1>
+        <div className="mu">
+          Today: <b>{now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</b>
+        </div>
+      </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        {/* Tier Card */}
-        <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-900/20 to-slate-900/50 p-6 backdrop-blur-xl">
-          <h2 className="text-base font-semibold text-white mb-1">
-            {state.calibrating ? "Calibrating Rank" : `Tier: ${getTier()}`}
-          </h2>
-          <div className="relative my-4 h-8 w-full border-b-2 border-slate-500">
-            <div
-              className="absolute bottom-0 h-6 w-1 bg-cyan-400 transition-all duration-500 shadow-[0_0_12px_#38bdf8]"
-              style={{ left: `${state.calibrating ? 10 : gaugePct}%` }}
-            />
+      <div className="tdy">
+        {/* Card 1: Daily Calibration Question */}
+        <div className="card dq">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2>Daily Calibration</h2>
+            {state.dailyDone ? (
+              <span className="tag" style={{ background: "rgba(46, 212, 122, 0.15)", color: "#2ED47A" }}>
+                Completed Today ✓
+              </span>
+            ) : (
+              <span className="tag strict">Strict Mode Recommended</span>
+            )}
           </div>
-          <div className="flex justify-between text-[11px] text-slate-400 mb-3">
-            {TIERS.map((t) => (
-              <span key={t}>{t}</span>
-            ))}
+
+          <p className="mu" style={{ margin: "6px 0 12px" }}>
+            Targeted at your current frontier in <b>{dailyQ.topic}</b>. Complete in strict mode for 1.5× score multiplier.
+          </p>
+
+          <div style={{ padding: "12px", background: "var(--cf)", borderRadius: "12px", marginBottom: "14px", border: "1px solid var(--ln)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <b style={{ fontSize: "16px" }}>{dailyQ.title}</b>
+              <span className={`dc d${["E", "M", "H"][dailyQ.difficulty]}`}>
+                {DIFFICULTY_LABELS[dailyQ.difficulty]}
+              </span>
+            </div>
+            <p className="mu" style={{ margin: 0, fontSize: "13px" }}>
+              {dailyQ.text}
+            </p>
           </div>
-          <p className="text-xs text-slate-400">
-            {state.calibrating
-              ? `Rated solves: ${state.solves || 0} / 10. Tier unlocks after 10 clean solves.`
-              : `Current hidden rating: ${state.rating}. Daily score represents active milestone mastery.`}
-          </p>
-        </div>
 
-        {/* Daily Question */}
-        <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-900/20 to-slate-900/50 p-6 backdrop-blur-xl">
-          <h2 className="text-base font-semibold text-white mb-2">
-            Daily Challenge
-          </h2>
-          {state.dailyDone ? (
-            <div className="space-y-3">
-              <p className="text-sm text-emerald-400 font-medium">
-                ✓ Completed for today!
-              </p>
-              <p className="text-xs text-slate-400">
-                Keep your momentum rolling with unpenalized stretch challenges.
-              </p>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div className="mu">
+              Reward: <b>{dailyQ.pts} Base Pts</b> ({Math.round(dailyQ.pts * 1.5)} in strict)
             </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-medium text-white">
-                  {dailyQ.title}
-                </span>
-                <span className="rounded-full border border-blue-400/30 px-2 py-0.5 text-[11px] text-cyan-300">
-                  {dailyQ.topic}
-                </span>
-                <span className="rounded-full border border-slate-600 px-2 py-0.5 text-[11px] text-slate-300">
-                  {DIFFICULTY_LABELS[dailyQ.l]}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Calibrated for your {dailyQ.topic} rating. Earn {dailyQ.pts}{" "}
-                standard points or{" "}
-                <b className="text-cyan-300">{dailyQ.pts * 1.5} pts</b> in
-                strict mode.
-              </p>
-              <button
-                onClick={handleOpenDaily}
-                className="rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-500/20 hover:opacity-90"
-              >
-                Open Question
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Stretch Chain */}
-        <div className="rounded-2xl border border-blue-500/20 bg-slate-900/40 p-6 backdrop-blur-xl">
-          <h2 className="text-base font-semibold text-white mb-2">
-            Stretch Questions
-          </h2>
-          <p className="text-xs text-slate-400 mb-4">
-            Optional. Failing incurs zero rating drops or streak losses.
-          </p>
-          {state.dailyDone ? (
-            <button
-              onClick={handleOpenStretch}
-              className="rounded-full border border-blue-400/40 px-4 py-2 text-xs font-medium text-cyan-300 hover:bg-blue-500/10"
-            >
-              Take Stretch Question ({stretchQ.title})
-            </button>
-          ) : (
-            <span className="text-xs text-slate-500">
-              Unlocks after daily question completion.
-            </span>
-          )}
-        </div>
-
-        {/* Topic Adjuster */}
-        <div className="rounded-2xl border border-blue-500/20 bg-slate-900/40 p-6 backdrop-blur-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-white">
-              Your Difficulty Targets
-            </h2>
-            <button
-              onClick={() => setLevelModalOpen(true)}
-              className="text-xs text-blue-400 hover:underline"
-            >
-              Edit Topics
+            <button className="btn" onClick={handleOpenDaily}>
+              {state.dailyDone ? "Review Solution" : "Start Today's Question →"}
             </button>
           </div>
-          <div className="space-y-3">
-            {topicsList.map((topic) => (
-              <div key={topic}>
-                <div className="flex justify-between text-xs text-slate-300 mb-1">
-                  <span>{topic}</span>
-                  <span className="font-semibold text-cyan-400">
-                    {DIFFICULTY_LABELS[state.levels[topic] ?? 1]}
-                  </span>
+        </div>
+
+        {/* Card 2: Skill Calibration / Topics */}
+        <div className="card mc">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2>Your Calibration</h2>
+            <button
+              className="btn ghost"
+              style={{ fontSize: "12px", padding: "4px 10px" }}
+              onClick={() => setActiveModal("tier")}
+            >
+              Info
+            </button>
+          </div>
+
+          <div className="gauge">
+            <i style={{ left: `${tierInfo.pct}%` }} />
+          </div>
+          <div className="tiers">
+            <span>Bronze</span>
+            <span>Silver</span>
+            <span>Gold</span>
+            <span>Diamond</span>
+            <span>Master</span>
+          </div>
+
+          <div style={{ marginTop: "14px" }}>
+            {topics.map((t) => {
+              const r = getTopicRating(t);
+              const status = getTopicStatus(t);
+              return (
+                <div key={t} className="tr">
+                  <div>
+                    <b>{t}</b>
+                    <span className="mu" style={{ marginLeft: "6px" }}>
+                      Lv.{L[t] + 1}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className={status.color} style={{ fontSize: "12px", fontWeight: 600 }}>
+                      {status.label}
+                    </span>
+                    <b>{r}</b>
+                    <button
+                      className="btn ghost"
+                      style={{ padding: "2px 8px", fontSize: "11px" }}
+                      onClick={() => {
+                        setActiveModal("level");
+                        setModalData({ topic: t });
+                      }}
+                    >
+                      Calibrate
+                    </button>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  value={state.levels[topic] ?? 1}
-                  onChange={(e) => setTopicLevel(topic, Number(e.target.value))}
-                  className="w-full accent-blue-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-                />
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Card 3: Streak Tracker */}
+        <div className="card streakc">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <span className="flame">🔥</span>
+              <div className="big">{st}</div>
+              <div className="mu">Day Streak Active</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div className="mu">Next Milestone</div>
+              <b>{nextMilestone} Days</b>
+            </div>
+          </div>
+
+          <div className="week" style={{ marginTop: "12px" }}>
+            {weekDays.map((label, idx) => {
+              const isPastOrToday = idx <= dayOfWeek;
+              const isToday = idx === dayOfWeek;
+              return (
+                <div
+                  key={idx}
+                  className={`wd ${isPastOrToday ? "on" : ""} ${isToday ? "now" : ""}`}
+                >
+                  <i>{label}</i>
+                  <span>{isPastOrToday ? "✓" : "•"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Card 4: Stretch Target */}
+        <div className="card">
+          <h2>Stretch Target</h2>
+          <p className="mu" style={{ margin: "4px 0 10px" }}>
+            An extra question 1 tier higher to accelerate your rating.
+          </p>
+
+          <div style={{ padding: "10px", background: "var(--cf)", borderRadius: "10px", marginBottom: "12px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <b>{stretchQ.title}</b>
+              <span className={`dc d${["E", "M", "H"][stretchQ.difficulty]}`}>
+                {DIFFICULTY_LABELS[stretchQ.difficulty]}
+              </span>
+            </div>
+            <div className="mu" style={{ fontSize: "12px", marginTop: "4px" }}>
+              Topic: {stretchQ.topic} • {stretchQ.pts} Base Pts
+            </div>
+          </div>
+
+          <button className="btn ghost" style={{ width: "100%" }} onClick={handleOpenStretch}>
+            Solve Stretch Question →
+          </button>
+        </div>
+
+        {/* Card 5: Word of the Day */}
+        <div className="card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2>Word of the Day</h2>
+            <span className="tag">Vocabulary</span>
+          </div>
+
+          <div className="word">{word[0]}</div>
+          <div className="mu" style={{ fontStyle: "italic", marginBottom: "6px" }}>
+            "{word[1]}"
+          </div>
+          <p className="mu" style={{ fontSize: "13px", margin: "6px 0 12px" }}>
+            {word[2]}
+          </p>
+
+          <button
+            className={`btn ${isWordLearned ? "ghost" : ""}`}
+            style={{ width: "100%" }}
+            onClick={handleLearnWord}
+          >
+            {isWordLearned ? "Learned for Today ✓" : "Mark as Learned (+10 Coins)"}
+          </button>
+        </div>
+
+        {/* Card 6: Monthly Activity Calendar */}
+        <div className="card wide">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <h2>
+              {now.toLocaleString("en-US", { month: "long" })} Practice Heatmap
+            </h2>
+            <div className="mu">
+              <b>{completedDaysCount}</b> active days this month
+            </div>
+          </div>
+
+          <div className="cal">
+            <b>Sun</b>
+            <b>Mon</b>
+            <b>Tue</b>
+            <b>Wed</b>
+            <b>Thu</b>
+            <b>Fri</b>
+            <b>Sat</b>
+
+            {calendarDays.map((item) => {
+              if (item.empty) {
+                return <i key={item.key} style={{ opacity: 0 }} />;
+              }
+
+              let levelClass = "";
+              if (item.count >= 3) levelClass = "l3";
+              else if (item.count === 2) levelClass = "l2";
+              else if (item.count === 1) levelClass = "l1";
+
+              const extraClasses = [
+                levelClass,
+                item.isDailyDone ? "dd" : "",
+                item.isToday ? "td" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <i
+                  key={item.key}
+                  className={extraClasses}
+                  title={`${item.key}: ${item.count} submissions`}
+                >
+                  {item.day}
+                </i>
+              );
+            })}
           </div>
         </div>
       </div>
