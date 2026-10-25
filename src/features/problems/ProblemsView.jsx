@@ -19,6 +19,8 @@ export function ProblemsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [refetchTick, setRefetchTick] = useState(0);
+
   const PAGE_SIZE = 25;
 
   // 1. Fetch DSA categories and user solve status from BE
@@ -61,13 +63,108 @@ export function ProblemsView() {
   }, []);
 
   // 2. Fetch problems list from BE when search, difficulty, or category changes
+  // useEffect(() => {
+  //   let isMounted = true;
+
+  //   async function fetchProblems() {
+  //     setLoading(true);
+  //     setError(null);
+
+  //     const diffParam =
+  //       selectedDifficulty === 0
+  //         ? "Easy"
+  //         : selectedDifficulty === 1
+  //           ? "Medium"
+  //           : selectedDifficulty === 2
+  //             ? "Hard"
+  //             : undefined;
+
+  //     try {
+  //       let rawList = [];
+
+  //       // If a specific topic slug is selected, call dedicated topic problems API
+  //       if (selectedTopic) {
+  //         try {
+  //           const topicRes = await api.topics.getCategoryProblems(selectedTopic, {
+  //             difficulty: diffParam,
+  //             search: query || undefined,
+  //           });
+  //           rawList = topicRes?.problems || [];
+  //         } catch {
+  //           // fallback to general problems API
+  //           const res = await api.problems.getAll({
+  //             difficulty: diffParam,
+  //             search: query || undefined,
+  //           });
+  //           rawList = res?.data || [];
+  //         }
+  //       } else {
+  //         // General problem catalog dedicated API: GET /api/problems
+  //         const res = await api.problems.getAll({
+  //           difficulty: diffParam,
+  //           search: query || undefined,
+  //         });
+  //         rawList = res?.data || [];
+  //       }
+
+  //       if (isMounted) {
+  //         if (Array.isArray(rawList)) {
+  //           const mapped = rawList.map((p, idx) => {
+  //             const diffStr = (p.difficulty || "Easy").toLowerCase();
+  //             const l = diffStr === "hard" ? 2 : diffStr === "medium" ? 1 : 0;
+  //             const probNum = p.problemNumber || p.number || idx + 1;
+  //             const slug = p.slug || `prob-${probNum}`;
+  //             const topicName =
+  //               p.topic ||
+  //               (p.tags && p.tags[0]) ||
+  //               (categories.find((c) => c.slug === selectedTopic)?.name) ||
+  //               "DSA Fundamentals";
+
+  //             return {
+  //               id: probNum,
+  //               problemNumber: probNum,
+  //               slug,
+  //               title: p.title || p.name || `Problem #${probNum}`,
+  //               t: topicName,
+  //               l,
+  //               d: l === 0 ? 1100 : l === 1 ? 1350 : 1700,
+  //               ac: p.solvedPercentage || 68 + ((probNum * 7) % 25),
+  //               pts: [10, 25, 50][l],
+  //               timeLimit: p.timeLimit,
+  //               memoryLimit: p.memoryLimit,
+  //               raw: p,
+  //             };
+  //           });
+  //           setProblems(mapped);
+  //         } else {
+  //           setProblems([]);
+  //         }
+  //       }
+  //     } catch (err) {
+  //       if (isMounted) {
+  //         console.warn("Could not fetch problems from BE:", err.message);
+  //         setError("Failed to load problems from backend server.");
+  //         setProblems([]);
+  //       }
+  //     } finally {
+  //       if (isMounted) {
+  //         setLoading(false);
+  //       }
+  //     }
+  //   }
+
+  //   fetchProblems();
+
+  //   return () => {
+  //     isMounted = false;
+  //   };
+  // }, [selectedDifficulty, selectedTopic, query, categories]);
+
   useEffect(() => {
     let isMounted = true;
-
     async function fetchProblems() {
       setLoading(true);
       setError(null);
-
       const diffParam =
         selectedDifficulty === 0
           ? "Easy"
@@ -78,85 +175,71 @@ export function ProblemsView() {
               : undefined;
 
       try {
-        let rawList = [];
-
-        // If a specific topic slug is selected, call dedicated topic problems API
+        let res;
         if (selectedTopic) {
           try {
-            const topicRes = await api.topics.getCategoryProblems(selectedTopic, {
+            res = await api.topics.getCategoryProblems(selectedTopic, {
               difficulty: diffParam,
               search: query || undefined,
             });
-            rawList = topicRes?.problems || [];
           } catch {
-            // fallback to general problems API
-            const res = await api.problems.getAll({
+            res = await api.problems.getAll({
               difficulty: diffParam,
               search: query || undefined,
             });
-            rawList = res?.data || [];
           }
         } else {
-          // General problem catalog dedicated API: GET /api/problems
-          const res = await api.problems.getAll({
+          res = await api.problems.getAll({
             difficulty: diffParam,
             search: query || undefined,
           });
-          rawList = res?.data || [];
         }
 
-        if (isMounted) {
-          if (Array.isArray(rawList)) {
-            const mapped = rawList.map((p, idx) => {
-              const diffStr = (p.difficulty || "Easy").toLowerCase();
-              const l = diffStr === "hard" ? 2 : diffStr === "medium" ? 1 : 0;
-              const probNum = p.problemNumber || p.number || idx + 1;
-              const slug = p.slug || `prob-${probNum}`;
-              const topicName =
-                p.topic ||
-                (p.tags && p.tags[0]) ||
-                (categories.find((c) => c.slug === selectedTopic)?.name) ||
-                "DSA Fundamentals";
+        // robust to any shape
+        const rawList =
+          res?.data?.problems ||
+          res?.problems ||
+          res?.data ||
+          (Array.isArray(res) ? res : []);
 
-              return {
-                id: probNum,
-                problemNumber: probNum,
-                slug,
-                title: p.title || p.name || `Problem #${probNum}`,
-                t: topicName,
-                l,
-                d: l === 0 ? 1100 : l === 1 ? 1350 : 1700,
-                ac: p.solvedPercentage || 68 + ((probNum * 7) % 25),
-                pts: [10, 25, 50][l],
-                timeLimit: p.timeLimit,
-                memoryLimit: p.memoryLimit,
-                raw: p,
-              };
-            });
-            setProblems(mapped);
-          } else {
-            setProblems([]);
-          }
+        if (isMounted) {
+          const mapped = rawList.map((p, idx) => {
+            const diffStr = (p.difficulty || "Easy").toLowerCase();
+            const l = diffStr === "hard" ? 2 : diffStr === "medium" ? 1 : 0;
+            const probNum = p.problemNumber || p.number || p._id || idx + 1;
+            return {
+              id: probNum,
+              problemNumber: probNum,
+              slug: p.slug || `prob-${probNum}`,
+              title: p.title || p.name || `Problem #${probNum}`,
+              t: p.topic || p.tags?.[0] || "DSA Fundamentals",
+              l,
+              d: l === 0 ? 1100 : l === 1 ? 1350 : 1700,
+              ac:
+                p.solvedPercentage ?? p.acceptance ?? 68 + ((probNum * 7) % 25),
+              pts: [10, 25, 50][l],
+              raw: p,
+            };
+          });
+          setProblems(mapped);
         }
       } catch (err) {
         if (isMounted) {
-          console.warn("Could not fetch problems from BE:", err.message);
-          setError("Failed to load problems from backend server.");
+          setError(err.message);
           setProblems([]);
         }
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     }
-
     fetchProblems();
-
     return () => {
       isMounted = false;
     };
-  }, [selectedDifficulty, selectedTopic, query, categories]);
+  }, [selectedDifficulty, selectedTopic, query, refetchTick]); // remove categories from deps
+
+  // fix retry
+  // <button onClick={() => setRefetchTick(t => t+1)}>Retry</button>
 
   // Combined solved status
   const userSolvedMap = useMemo(() => {
@@ -237,11 +320,14 @@ export function ProblemsView() {
     state.levels,
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredProblems.length / PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProblems.length / PAGE_SIZE),
+  );
   const currentPage = Math.min(page, totalPages - 1);
   const rows = filteredProblems.slice(
     currentPage * PAGE_SIZE,
-    currentPage * PAGE_SIZE + PAGE_SIZE
+    currentPage * PAGE_SIZE + PAGE_SIZE,
   );
 
   const recommendations = filteredProblems.slice(0, 3);
@@ -266,7 +352,8 @@ export function ProblemsView() {
       <div style={{ marginBottom: "14px" }}>
         <h1>Problems Catalog</h1>
         <p className="mu" style={{ margin: "4px 0" }}>
-          Live catalogue fetched from backend API. Filter by difficulty, category, status, or search keywords.
+          Live catalogue fetched from backend API. Filter by difficulty,
+          category, status, or search keywords.
         </p>
       </div>
 
@@ -327,7 +414,9 @@ export function ProblemsView() {
                   setPage(0);
                 }}
               >
-                <option value="">All Categories ({categories.length || "All"})</option>
+                <option value="">
+                  All Categories ({categories.length || "All"})
+                </option>
                 {categories.length > 0
                   ? categories.map((c) => (
                       <option key={c.slug} value={c.slug}>
@@ -479,7 +568,7 @@ export function ProblemsView() {
                 <button
                   className="btn ghost"
                   style={{ marginTop: "10px" }}
-                  onClick={() => setSelectedDifficulty((d) => d)}
+                  onClick={() => setRefetchTick((tick) => tick + 1)}
                 >
                   Retry Connection
                 </button>
@@ -517,7 +606,8 @@ export function ProblemsView() {
                   </thead>
                   <tbody>
                     {rows.map((p) => {
-                      const isSolved = userSolvedMap[p.id] || userSolvedMap[p.slug];
+                      const isSolved =
+                        userSolvedMap[p.id] || userSolvedMap[p.slug];
                       const diffClass = ["dE", "dM", "dH"][p.l];
                       return (
                         <tr
@@ -566,7 +656,9 @@ export function ProblemsView() {
                   <button
                     className="btn ghost"
                     disabled={currentPage >= totalPages - 1}
-                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    onClick={() =>
+                      setPage((p) => Math.min(totalPages - 1, p + 1))
+                    }
                   >
                     Next ›
                   </button>
@@ -580,7 +672,9 @@ export function ProblemsView() {
         <aside>
           <div className="card">
             <h3>Recommended Next</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+            >
               {recommendations.length > 0 ? (
                 recommendations.map((p) => (
                   <div
@@ -607,12 +701,19 @@ export function ProblemsView() {
                         {DIFFICULTY_LABELS[p.l]}
                       </span>
                     </div>
-                    <div className="mu" style={{ fontSize: "11px", margin: "4px 0 6px" }}>
+                    <div
+                      className="mu"
+                      style={{ fontSize: "11px", margin: "4px 0 6px" }}
+                    >
                       {p.t} • {p.pts} Pts
                     </div>
                     <button
                       className="btn"
-                      style={{ fontSize: "11px", padding: "3px 10px", width: "100%" }}
+                      style={{
+                        fontSize: "11px",
+                        padding: "3px 10px",
+                        width: "100%",
+                      }}
                       onClick={() => openProblemInSolver(p)}
                     >
                       Solve Now →
@@ -629,12 +730,15 @@ export function ProblemsView() {
 
           <div className="card">
             <h3>Difficulty Breakdown</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+            >
               {[0, 1, 2].map((lvl) => {
                 const sCount = stats.solved[lvl];
                 const tCount = Math.max(1, stats.total[lvl]);
                 const pct = Math.round((sCount / tCount) * 100);
-                const color = lvl === 0 ? "#2ED47A" : lvl === 1 ? "#E59A00" : "#FF5C7A";
+                const color =
+                  lvl === 0 ? "#2ED47A" : lvl === 1 ? "#E59A00" : "#FF5C7A";
 
                 return (
                   <div key={lvl}>

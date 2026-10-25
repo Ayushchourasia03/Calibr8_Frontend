@@ -9,7 +9,9 @@ const TOKEN_STORAGE_KEY = "calibr8_token";
 export const tokenStorage = {
   get: () => {
     try {
-      return localStorage.getItem(TOKEN_STORAGE_KEY) || localStorage.getItem("token");
+      return (
+        localStorage.getItem(TOKEN_STORAGE_KEY) || localStorage.getItem("token")
+      );
     } catch {
       return null;
     }
@@ -64,7 +66,7 @@ export const apiConfig = {
       return envUrl.trim().replace(/\/+$/, "");
     }
 
-    return "http://localhost:3000";
+    return import.meta.env?.DEV ? "" : "http://localhost:3000";
   },
 
   setBaseUrl: (url) => {
@@ -94,7 +96,11 @@ function resolveUrl(endpoint) {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
 
   // If endpoint is a root probe (e.g. "/" or "/ping" or "/health"), allow root path
-  if (cleanEndpoint === "/" || cleanEndpoint === "/ping" || cleanEndpoint === "/health") {
+  if (
+    cleanEndpoint === "/" ||
+    cleanEndpoint === "/ping" ||
+    cleanEndpoint === "/health"
+  ) {
     return `${cleanBase}${cleanEndpoint}`;
   }
 
@@ -131,7 +137,7 @@ export async function request(endpoint, options = {}) {
   } catch (networkError) {
     // Network failure (backend offline, CORS, or connection refused)
     const err = new Error(
-      `Cannot connect to Calibr8 backend at ${targetUrl}. Please ensure the server on localhost:3000 is running.`
+      `Cannot connect to Calibr8 backend at ${targetUrl}. Please ensure the server on localhost:3000 is running.`,
     );
     err.isNetworkError = true;
     err.original = networkError;
@@ -174,8 +180,8 @@ export const api = {
   // 4. System & Health APIs
   system: {
     getInfo: () => request("/", { headers: { Accept: "application/json" } }),
-    health: () => request("/health"),
-    ping: () => request("/ping"),
+    health: () => request("/api/health"),
+    ping: () => request("/api/ping"),
   },
 
   // 5. Authentication APIs (/api/auth)
@@ -295,9 +301,12 @@ export const api = {
       if (difficulty) params.append("difficulty", difficulty);
       if (search) params.append("search", search);
       const query = params.toString() ? `?${params.toString()}` : "";
-      return await request(`/topics/dsa/${encodeURIComponent(slug)}/problems${query}`, {
-        method: "GET",
-      });
+      return await request(
+        `/topics/dsa/${encodeURIComponent(slug)}/problems${query}`,
+        {
+          method: "GET",
+        },
+      );
     },
 
     getByIdentifier: async (identifier) => {
@@ -388,7 +397,7 @@ export const api = {
 
     pollSubmission: async (
       id,
-      { onProgress, maxAttempts = 20, intervalMs = 1000 } = {}
+      { onProgress, maxAttempts = 20, intervalMs = 1000 } = {},
     ) => {
       for (let i = 0; i < maxAttempts; i++) {
         const res = await api.execution.getSubmission(id);
@@ -406,7 +415,9 @@ export const api = {
         }
         await new Promise((r) => setTimeout(r, intervalMs));
       }
-      throw new Error("Submission execution timed out. Please check again later.");
+      throw new Error(
+        "Submission execution timed out. Please check again later.",
+      );
     },
   },
 
@@ -436,15 +447,18 @@ export const api = {
     },
 
     getSubject: async (subjectSlug) => {
-      return await request(`/study/subjects/${encodeURIComponent(subjectSlug)}`, {
-        method: "GET",
-      });
+      return await request(
+        `/study/subjects/${encodeURIComponent(subjectSlug)}`,
+        {
+          method: "GET",
+        },
+      );
     },
 
     getChapterTopics: async (chapterId) => {
       return await request(
         `/study/chapters/${encodeURIComponent(chapterId)}/topics`,
-        { method: "GET" }
+        { method: "GET" },
       );
     },
 
@@ -460,7 +474,7 @@ export const api = {
         {
           method: "POST",
           body: JSON.stringify({ answers }),
-        }
+        },
       );
     },
   },
