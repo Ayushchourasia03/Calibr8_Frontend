@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { DIFFICULTY_LABELS } from "../../data/constants";
-import { api } from "../../services/api";
+import { api, tokenStorage } from "../../services/api";
 
 export function ProblemsView() {
   const { state, openProblemInSolver } = useCalibr8();
@@ -36,6 +36,8 @@ export function ProblemsView() {
       } catch (err) {
         console.warn("Could not fetch categories from BE:", err.message);
       }
+
+      if (!tokenStorage.get()) return;
 
       try {
         const solvedRes = await api.users.getSolvedProblems();
