@@ -53,6 +53,7 @@ export function OnboardingModal() {
   );
   const [selectedTopics, setSelectedTopics] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
 
   if (!isOpen) return null;
@@ -97,50 +98,29 @@ export function OnboardingModal() {
     setLoading(true);
     try {
       if (authMode === "login") {
-        try {
-          const res = await authApi.login({ email: cleanEmail, password });
-          if (res?.user) {
-            setState((s) => ({
-              ...s,
-              user: res.user,
-              started: res.user.onboarded || s.started,
-            }));
-          }
-          showToast("Signed in successfully.");
-        } catch {
-          // If offline mock mode, preserve user session
+        const res = await authApi.login({ email: cleanEmail, password });
+        if (res?.user) {
           setState((s) => ({
             ...s,
-            user: {
-              email: cleanEmail,
-              name: cleanEmail.split("@")[0],
-              role: "user",
-            },
+            user: res.user,
+            started: res.user.onboarded || s.started,
           }));
-          showToast("Signed in.");
         }
+        showToast("Signed in successfully.");
       } else {
-        try {
-          const res = await authApi.register({
-            name: name.trim(),
-            email: cleanEmail,
-            password,
-          });
-          if (res?.user) {
-            setState((s) => ({ ...s, user: res.user, started: false }));
-          }
-          showToast("Account created successfully.");
-        } catch {
+        const res = await authApi.register({
+          name: name.trim(),
+          email: cleanEmail,
+          password,
+        });
+        if (res?.user) {
           setState((s) => ({
             ...s,
-            user: {
-              email: cleanEmail,
-              name: name.trim(),
-              role: "user",
-            },
+            user: res.user,
+            started: false,
           }));
-          showToast("Account created.");
         }
+        showToast("Account created successfully.");
       }
       setError("");
       setStep(1); // Proceed to Step 2 (DSA Topic Calibration)
@@ -219,39 +199,75 @@ export function OnboardingModal() {
 
   // --- Journey Finalization (Step 3) ---
   const handleFinish = async () => {
-    const topicKeys = Object.keys(state.levels || {});
-    const ratings = topicKeys.map((t) => state.ratings?.[t] || 800);
+    const selectedTopicLevels = Array.from(selectedTopics, (topic) => [
+      topic,
+      state.levels?.[topic] ?? 0,
+    ]);
+    if (selectedTopicLevels.length === 0) {
+      setError("Choose a level for at least one topic to continue.");
+      return;
+    }
+
+    setError("");
+    setFinishing(true);
+    const ratings = selectedTopicLevels.map(
+      ([topic]) => state.ratings?.[topic] ?? 800,
+    );
     const avgRating = Math.round(
       ratings.reduce((a, b) => a + b, 0) / (ratings.length || 1),
     );
 
-    setState((s) => ({
-      ...s,
-      started: true,
-      rating: avgRating || 800,
-      lang: selectedLang,
-      calibrating: true,
-      freeDry: s.freeDry || 3,
-      view: "home",
-    }));
-
     try {
-      const topicSelections = Object.entries(state.levels || {}).map(
-        ([topic, lvl]) => ({
-          topicId: `dsa-${topic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-          difficulty: ["easy", "medium", "hard"][lvl] || "easy",
-        }),
-      );
-      await onboardingApi.submit({ topicSelections });
-      await onboardingApi.updateLanguage(
-        selectedLang.toLowerCase().replace(/[^a-z]/g, ""),
-      );
-    } catch (err) {
-      console.warn("Backend onboarding sync note:", err.message);
-    }
+      const topicSelections = selectedTopicLevels.map(([topic, lvl]) => ({
+        topicId: `dsa-${topic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+        difficulty: ["easy", "medium", "hard"][lvl] || "easy",
+      }));
+      const result = state.user?.guest
+        ? { success: true }
+        : await onboardingApi.submit({ topicSelections });
 
-    showToast("Welcome to Calibr8! Your daily practice is ready.");
-    close();
+      if (!result?.success) {
+        throw new Error("Onboarding could not be saved. Please try again.");
+      }
+
+      const language = {
+        Python: "python",
+        Python3: "python",
+        JavaScript: "javascript",
+        "C++": "cpp",
+        Java: "java",
+        C: "c",
+      }[selectedLang];
+      if (language && !state.user?.guest) {
+        try {
+          await onboardingApi.updateLanguage(language);
+        } catch (err) {
+          console.warn("Backend language sync note:", err.message);
+        }
+      }
+
+      setState((s) => ({
+        ...s,
+        started: true,
+        rating: result.user?.rating ?? (avgRating || 800),
+        lang: selectedLang,
+        calibrating: true,
+        freeDry: s.freeDry || 3,
+        view: "home",
+        user: s.user
+          ? { ...s.user, ...(result.user || {}), onboarded: true }
+          : s.user,
+      }));
+
+      showToast("Welcome to Calibr8! Your daily practice is ready.");
+      close();
+    } catch (err) {
+      setError(
+        err.message || "Onboarding could not be saved. Please try again.",
+      );
+    } finally {
+      setFinishing(false);
+    }
   };
 
   return (
@@ -510,6 +526,8 @@ export function OnboardingModal() {
               any question.
             </p>
 
+            {error && <div className="onboard-error-banner">{error}</div>}
+
             <div className="language-select-wrapper">
               <select
                 aria-label="Pick your language"
@@ -552,8 +570,9 @@ export function OnboardingModal() {
                 type="button"
                 className="modal-btn-dark"
                 onClick={handleFinish}
+                disabled={finishing}
               >
-                Start my journey
+                {finishing ? "Saving..." : "Start my journey"}
               </button>
             </div>
           </div>

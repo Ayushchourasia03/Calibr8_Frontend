@@ -136,10 +136,50 @@ const mockStore = {
   currentUser: null,
   submissions: new Map(),
   themes: [
-    { id: "theme-default", slug: "default", name: "Default Dark", price: 0, previewColor: "#3b82f6", isDefault: true, owned: true, applied: true, canAfford: true },
-    { id: "theme-neon", slug: "neon", name: "Cyberpunk Neon", price: 100, previewColor: "#ff2e63", isDefault: false, owned: false, applied: false, canAfford: true },
-    { id: "theme-pixel", slug: "pixel", name: "Pixel Forest", price: 150, previewColor: "#4caf50", isDefault: false, owned: false, applied: false, canAfford: false },
-    { id: "theme-race", slug: "race", name: "Apex Racing", price: 200, previewColor: "#e10600", isDefault: false, owned: false, applied: false, canAfford: false },
+    {
+      id: "theme-default",
+      slug: "default",
+      name: "Default Dark",
+      price: 0,
+      previewColor: "#3b82f6",
+      isDefault: true,
+      owned: true,
+      applied: true,
+      canAfford: true,
+    },
+    {
+      id: "theme-neon",
+      slug: "neon",
+      name: "Cyberpunk Neon",
+      price: 100,
+      previewColor: "#ff2e63",
+      isDefault: false,
+      owned: false,
+      applied: false,
+      canAfford: true,
+    },
+    {
+      id: "theme-pixel",
+      slug: "pixel",
+      name: "Pixel Forest",
+      price: 150,
+      previewColor: "#4caf50",
+      isDefault: false,
+      owned: false,
+      applied: false,
+      canAfford: false,
+    },
+    {
+      id: "theme-race",
+      slug: "race",
+      name: "Apex Racing",
+      price: 200,
+      previewColor: "#e10600",
+      isDefault: false,
+      owned: false,
+      applied: false,
+      canAfford: false,
+    },
   ],
 };
 
@@ -150,7 +190,11 @@ function handleMockFallback(endpoint, options = {}) {
 
   // 4. System & Health
   if (cleanPath === "/health" || cleanPath === "") {
-    return { status: "ok", service: "Calibr8 Backend", timestamp: new Date().toISOString() };
+    return {
+      status: "ok",
+      service: "Calibr8 Backend",
+      timestamp: new Date().toISOString(),
+    };
   }
   if (cleanPath === "/ping") {
     return "pong";
@@ -160,7 +204,9 @@ function handleMockFallback(endpoint, options = {}) {
   if (cleanPath === "/auth/register" && method === "POST") {
     const { email, password, name, role = "user" } = body;
     if (!email || !password || !name) {
-      const err = new Error("Validation error: email, password, and name are required.");
+      const err = new Error(
+        "Validation error: email, password, and name are required.",
+      );
       err.code = "VALIDATION_ERROR";
       err.status = 400;
       throw err;
@@ -198,7 +244,12 @@ function handleMockFallback(endpoint, options = {}) {
     mockStore.users.set(normEmail, newUser);
     mockStore.currentUser = newUser;
     const fakeToken = `eyJh-${btoa(normEmail)}-token`;
-    return { success: true, message: "User registered successfully.", token: fakeToken, user: newUser };
+    return {
+      success: true,
+      message: "User registered successfully.",
+      token: fakeToken,
+      user: newUser,
+    };
   }
 
   if (cleanPath === "/auth/login" && method === "POST") {
@@ -228,17 +279,27 @@ function handleMockFallback(endpoint, options = {}) {
     }
     mockStore.currentUser = user;
     const fakeToken = `eyJh-${btoa(normEmail || "default")}-token`;
-    return { success: true, message: "Login successful.", token: fakeToken, user };
+    return {
+      success: true,
+      message: "Login successful.",
+      token: fakeToken,
+      user,
+    };
   }
 
   if (cleanPath === "/auth/me" || cleanPath === "/auth/verify") {
-    const user = mockStore.currentUser || Array.from(mockStore.users.values())[0];
+    const user =
+      mockStore.currentUser || Array.from(mockStore.users.values())[0];
     return { success: true, user };
   }
 
   if (cleanPath === "/auth/refresh") {
     const fakeToken = `eyJh-${Date.now()}-refresh-token`;
-    return { success: true, message: "Token refreshed successfully.", token: fakeToken };
+    return {
+      success: true,
+      message: "Token refreshed successfully.",
+      token: fakeToken,
+    };
   }
 
   if (cleanPath === "/auth/logout") {
@@ -248,7 +309,8 @@ function handleMockFallback(endpoint, options = {}) {
 
   // 6. User Profile
   if (cleanPath === "/users/me" && method === "GET") {
-    const user = mockStore.currentUser || Array.from(mockStore.users.values())[0];
+    const user =
+      mockStore.currentUser || Array.from(mockStore.users.values())[0];
     return { success: true, user };
   }
 
@@ -259,16 +321,27 @@ function handleMockFallback(endpoint, options = {}) {
     return { success: true, user: mockStore.currentUser };
   }
 
-  if (cleanPath.startsWith("/users/me/language") || cleanPath === "/users/language") {
-    if (mockStore.currentUser) mockStore.currentUser.preferredLanguage = body.language;
+  if (
+    cleanPath.startsWith("/users/me/language") ||
+    cleanPath === "/users/language"
+  ) {
+    if (mockStore.currentUser)
+      mockStore.currentUser.preferredLanguage = body.language;
     return { success: true, language: body.language };
   }
 
-  if (cleanPath.startsWith("/users/me/academic") || cleanPath === "/users/academic") {
+  if (
+    cleanPath.startsWith("/users/me/academic") ||
+    cleanPath === "/users/academic"
+  ) {
     if (mockStore.currentUser) {
       Object.assign(mockStore.currentUser, body);
     }
-    return { success: true, message: "Academic profile saved", user: mockStore.currentUser };
+    return {
+      success: true,
+      message: "Academic profile saved",
+      user: mockStore.currentUser,
+    };
   }
 
   if (cleanPath === "/users/all") {
@@ -276,8 +349,24 @@ function handleMockFallback(endpoint, options = {}) {
       success: true,
       message: "Problems fetched successfully",
       data: [
-        { name: "Two Sum", slug: "two-sum-001", number: 1, topic: "Arrays & Hashing", topicSlug: "arrays-and-hashing", level: "easy", isSolved: true },
-        { name: "Longest Calm Window", slug: "longest-calm-window", number: 2, topic: "Sliding Window", topicSlug: "sliding-window", level: "medium", isSolved: true },
+        {
+          name: "Two Sum",
+          slug: "two-sum-001",
+          number: 1,
+          topic: "Arrays & Hashing",
+          topicSlug: "arrays-and-hashing",
+          level: "easy",
+          isSolved: true,
+        },
+        {
+          name: "Longest Calm Window",
+          slug: "longest-calm-window",
+          number: 2,
+          topic: "Sliding Window",
+          topicSlug: "sliding-window",
+          level: "medium",
+          isSolved: true,
+        },
       ],
     };
   }
@@ -289,20 +378,62 @@ function handleMockFallback(endpoint, options = {}) {
       { id: "t-2", slug: "dsa-strings", name: "Strings", category: "DSA" },
       { id: "t-3", slug: "dsa-recursion", name: "Recursion", category: "DSA" },
       { id: "t-4", slug: "dsa-graphs", name: "Graphs", category: "DSA" },
-      { id: "t-5", slug: "dsa-sliding-window", name: "Sliding Window", category: "DSA" },
+      {
+        id: "t-5",
+        slug: "dsa-sliding-window",
+        name: "Sliding Window",
+        category: "DSA",
+      },
       { id: "t-6", slug: "dsa-dp", name: "DP", category: "DSA" },
       { id: "t-7", slug: "dsa-trees", name: "Trees", category: "DSA" },
-      { id: "t-8", slug: "dsa-linked-list", name: "Linked List", category: "DSA" },
+      {
+        id: "t-8",
+        slug: "dsa-linked-list",
+        name: "Linked List",
+        category: "DSA",
+      },
     ];
-    return { success: true, count: dsaTopics.length, topics: dsaTopics, dsaTopics };
+    return {
+      success: true,
+      count: dsaTopics.length,
+      topics: dsaTopics,
+      dsaTopics,
+    };
   }
 
-  if (cleanPath === "/topics/categories" || cleanPath === "/topics/dsa/categories") {
+  if (
+    cleanPath === "/topics/categories" ||
+    cleanPath === "/topics/dsa/categories"
+  ) {
     return [
-      { id: "cat-1", slug: "arrays-and-hashing", name: "Arrays & Hashing", order: 1, totalProblems: 24 },
-      { id: "cat-2", slug: "two-pointers", name: "Two Pointers", order: 2, totalProblems: 14 },
-      { id: "cat-3", slug: "sliding-window", name: "Sliding Window", order: 3, totalProblems: 16 },
-      { id: "cat-4", slug: "graphs", name: "Graphs & DP", order: 4, totalProblems: 22 },
+      {
+        id: "cat-1",
+        slug: "arrays-and-hashing",
+        name: "Arrays & Hashing",
+        order: 1,
+        totalProblems: 24,
+      },
+      {
+        id: "cat-2",
+        slug: "two-pointers",
+        name: "Two Pointers",
+        order: 2,
+        totalProblems: 14,
+      },
+      {
+        id: "cat-3",
+        slug: "sliding-window",
+        name: "Sliding Window",
+        order: 3,
+        totalProblems: 16,
+      },
+      {
+        id: "cat-4",
+        slug: "graphs",
+        name: "Graphs & DP",
+        order: 4,
+        totalProblems: 22,
+      },
     ];
   }
 
@@ -337,9 +468,36 @@ function handleMockFallback(endpoint, options = {}) {
       success: true,
       count: 24,
       data: [
-        { id: "prob-1", problemNumber: 1, slug: "two-sum-001", title: "Two Sum", difficulty: "Easy", timeLimit: 1000, memoryLimit: 256, _count: { testcases: 6, templates: 4 } },
-        { id: "prob-2", problemNumber: 2, slug: "valid-parentheses", title: "Valid Parentheses", difficulty: "Easy", timeLimit: 1000, memoryLimit: 256, _count: { testcases: 8, templates: 4 } },
-        { id: "prob-3", problemNumber: 3, slug: "longest-calm-window", title: "Longest Calm Window", difficulty: "Medium", timeLimit: 1000, memoryLimit: 256, _count: { testcases: 10, templates: 4 } },
+        {
+          id: "prob-1",
+          problemNumber: 1,
+          slug: "two-sum-001",
+          title: "Two Sum",
+          difficulty: "Easy",
+          timeLimit: 1000,
+          memoryLimit: 256,
+          _count: { testcases: 6, templates: 4 },
+        },
+        {
+          id: "prob-2",
+          problemNumber: 2,
+          slug: "valid-parentheses",
+          title: "Valid Parentheses",
+          difficulty: "Easy",
+          timeLimit: 1000,
+          memoryLimit: 256,
+          _count: { testcases: 8, templates: 4 },
+        },
+        {
+          id: "prob-3",
+          problemNumber: 3,
+          slug: "longest-calm-window",
+          title: "Longest Calm Window",
+          difficulty: "Medium",
+          timeLimit: 1000,
+          memoryLimit: 256,
+          _count: { testcases: 10, templates: 4 },
+        },
       ],
     };
   }
@@ -349,10 +507,25 @@ function handleMockFallback(endpoint, options = {}) {
     return {
       success: true,
       languages: [
-        { key: "python", label: "Python", version: "Python 3.10", starterAvailable: true },
-        { key: "javascript", label: "JavaScript", version: "Node.js 22", starterAvailable: true },
+        {
+          key: "python",
+          label: "Python",
+          version: "Python 3.10",
+          starterAvailable: true,
+        },
+        {
+          key: "javascript",
+          label: "JavaScript",
+          version: "Node.js 22",
+          starterAvailable: true,
+        },
         { key: "cpp", label: "C++", version: "GCC 13", starterAvailable: true },
-        { key: "java", label: "Java", version: "OpenJDK 17", starterAvailable: true },
+        {
+          key: "java",
+          label: "Java",
+          version: "OpenJDK 17",
+          starterAvailable: true,
+        },
       ],
     };
   }
@@ -364,8 +537,26 @@ function handleMockFallback(endpoint, options = {}) {
       passedCount: 2,
       totalCount: 2,
       cases: [
-        { index: 0, input: "4\n2 7 11 15\n9", expected: "0 1", actual: "0 1", studentStdout: "debugging test run\n", status: "Accepted", timeMs: 34, memoryKb: 12400 },
-        { index: 1, input: "3\n3 2 4\n6", expected: "1 2", actual: "1 2", studentStdout: "", status: "Accepted", timeMs: 28, memoryKb: 12200 },
+        {
+          index: 0,
+          input: "4\n2 7 11 15\n9",
+          expected: "0 1",
+          actual: "0 1",
+          studentStdout: "debugging test run\n",
+          status: "Accepted",
+          timeMs: 34,
+          memoryKb: 12400,
+        },
+        {
+          index: 1,
+          input: "3\n3 2 4\n6",
+          expected: "1 2",
+          actual: "1 2",
+          studentStdout: "",
+          status: "Accepted",
+          timeMs: 28,
+          memoryKb: 12200,
+        },
       ],
     };
   }
@@ -414,19 +605,60 @@ function handleMockFallback(endpoint, options = {}) {
   // 12. Study
   if (cleanPath === "/study/subjects") {
     return [
-      { id: "subj-cn", slug: "cn", name: "Computer Networks", description: "Comprehensive networking syllabus", icon: null, order: 1, _count: { chapters: 13 } },
-      { id: "subj-dbms", slug: "dbms", name: "Database Management Systems", description: "Relational algebra, SQL, ACID", icon: null, order: 2, _count: { chapters: 16 } },
-      { id: "subj-os", slug: "os", name: "Operating Systems", description: "Processes, memory, scheduling", icon: null, order: 3, _count: { chapters: 16 } },
-      { id: "subj-system-design", slug: "system-design", name: "System Design", description: "Scalability, caching, distributed transactions", icon: null, order: 4, _count: { chapters: 16 } },
+      {
+        id: "subj-cn",
+        slug: "cn",
+        name: "Computer Networks",
+        description: "Comprehensive networking syllabus",
+        icon: null,
+        order: 1,
+        _count: { chapters: 13 },
+      },
+      {
+        id: "subj-dbms",
+        slug: "dbms",
+        name: "Database Management Systems",
+        description: "Relational algebra, SQL, ACID",
+        icon: null,
+        order: 2,
+        _count: { chapters: 16 },
+      },
+      {
+        id: "subj-os",
+        slug: "os",
+        name: "Operating Systems",
+        description: "Processes, memory, scheduling",
+        icon: null,
+        order: 3,
+        _count: { chapters: 16 },
+      },
+      {
+        id: "subj-system-design",
+        slug: "system-design",
+        name: "System Design",
+        description: "Scalability, caching, distributed transactions",
+        icon: null,
+        order: 4,
+        _count: { chapters: 16 },
+      },
     ];
   }
 
   // 13. Themes
   if (cleanPath === "/themes") {
-    return { success: true, coins: mockStore.currentUser?.coins ?? 120, themes: mockStore.themes };
+    return {
+      success: true,
+      coins: mockStore.currentUser?.coins ?? 120,
+      themes: mockStore.themes,
+    };
   }
   if (cleanPath === "/themes/me") {
-    return { success: true, coins: mockStore.currentUser?.coins ?? 120, activeTheme: "default", ownedThemes: ["default"] };
+    return {
+      success: true,
+      coins: mockStore.currentUser?.coins ?? 120,
+      activeTheme: "default",
+      ownedThemes: ["default"],
+    };
   }
 
   // 14. Rankings
@@ -434,9 +666,39 @@ function handleMockFallback(endpoint, options = {}) {
     return {
       success: true,
       data: [
-        { id: "u-1", name: "Aarav Sharma", score: 2840, rating: 1840, streak: 42, strictPercent: 96, tier: "Aurora II", college: "IIT Delhi", country: "India" },
-        { id: "u-2", name: "Ananya Patel", score: 2610, rating: 1780, streak: 35, strictPercent: 94, tier: "Aurora I", college: "BITS Pilani", country: "India" },
-        { id: "u-3", name: "Rohan Verma", score: 2420, rating: 1690, streak: 28, strictPercent: 90, tier: "Eclipse III", college: "NIT Trichy", country: "India" },
+        {
+          id: "u-1",
+          name: "Aarav Sharma",
+          score: 2840,
+          rating: 1840,
+          streak: 42,
+          strictPercent: 96,
+          tier: "Aurora II",
+          college: "IIT Delhi",
+          country: "India",
+        },
+        {
+          id: "u-2",
+          name: "Ananya Patel",
+          score: 2610,
+          rating: 1780,
+          streak: 35,
+          strictPercent: 94,
+          tier: "Aurora I",
+          college: "BITS Pilani",
+          country: "India",
+        },
+        {
+          id: "u-3",
+          name: "Rohan Verma",
+          score: 2420,
+          rating: 1690,
+          streak: 28,
+          strictPercent: 90,
+          tier: "Eclipse III",
+          college: "NIT Trichy",
+          country: "India",
+        },
       ],
     };
   }
@@ -450,9 +712,10 @@ function handleMockFallback(endpoint, options = {}) {
  * Strictly enforces Authorization headers, error propagation, and offline resilience.
  */
 export async function request(endpoint, options = {}) {
+  const { disableMockFallback = false, ...requestOptions } = options;
   const headers = {
     "Content-Type": "application/json",
-    ...(options.headers || {}),
+    ...(requestOptions.headers || {}),
   };
 
   const token = tokenStorage.get();
@@ -464,7 +727,7 @@ export async function request(endpoint, options = {}) {
 
   try {
     const response = await fetch(targetUrl, {
-      ...options,
+      ...requestOptions,
       headers,
     });
 
@@ -496,13 +759,13 @@ export async function request(endpoint, options = {}) {
   } catch (networkOrResponseError) {
     // If backend offline or connection refused, use seamless in-memory fallback
     if (
-      networkOrResponseError.isNetworkError ||
+      (!disableMockFallback && networkOrResponseError.isNetworkError) ||
       networkOrResponseError.name === "TypeError" ||
       networkOrResponseError.message?.includes("Failed to fetch") ||
       networkOrResponseError.message?.includes("NetworkError") ||
       networkOrResponseError.status === 404
     ) {
-      return handleMockFallback(endpoint, options);
+      return handleMockFallback(endpoint, requestOptions);
     }
     throw networkOrResponseError;
   }

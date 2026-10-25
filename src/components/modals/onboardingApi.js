@@ -14,6 +14,7 @@ export const onboardingApi = {
     return await request("/onboarding", {
       method: "POST",
       body: JSON.stringify(payload),
+      disableMockFallback: true,
     });
   },
 
