@@ -480,11 +480,17 @@ export function Calibr8Provider({ children }) {
   };
 
   const logout = async () => {
-    await api.auth.logout();
-    setState((s) => ({
-      ...s,
-      user: null,
-    }));
+    try {
+      await api.auth.logout();
+    } catch (err) {
+      console.warn("Backend logout note:", err.message);
+    } finally {
+      tokenStorage.remove();
+      setState((s) => ({
+        ...s,
+        user: null,
+      }));
+    }
   };
 
   const refreshUser = async () => {
@@ -533,7 +539,9 @@ export function Calibr8Provider({ children }) {
 
   const updateLanguage = async (language) => {
     setState((s) => ({ ...s, lang: language }));
-    if (tokenStorage.get()) {
+    try {
+      await api.onboarding.updateLanguage(language);
+    } catch {
       try {
         await api.users.updateLanguage({ language });
       } catch (err) {
@@ -543,10 +551,20 @@ export function Calibr8Provider({ children }) {
   };
 
   const saveOnboarding = async (payload) => {
-    if (tokenStorage.get()) {
-      return await api.onboarding.submit(payload);
+    try {
+      const res = await api.onboarding.submit(payload);
+      if (res?.user) {
+        setState((s) => ({
+          ...s,
+          user: { ...s.user, ...res.user },
+          started: true,
+        }));
+      }
+      return res;
+    } catch (err) {
+      console.warn("Backend onboarding note:", err.message);
+      return null;
     }
-    return null;
   };
 
   // Run code against backend execution sandbox (/api/execution/runs)

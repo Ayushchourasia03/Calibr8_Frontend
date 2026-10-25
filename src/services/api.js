@@ -66,7 +66,7 @@ export const apiConfig = {
       return envUrl.trim().replace(/\/+$/, "");
     }
 
-    return import.meta.env?.DEV ? "" : "http://localhost:3000";
+    return "http://localhost:3000";
   },
 
   setBaseUrl: (url) => {

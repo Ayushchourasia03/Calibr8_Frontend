@@ -154,15 +154,27 @@ export function TodayView() {
 
         {/* Card 2: Skill Calibration / Topics */}
         <div className="card mc">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
             <h2>Your Calibration</h2>
-            <button
-              className="btn ghost"
-              style={{ fontSize: "12px", padding: "4px 10px" }}
-              onClick={() => setActiveModal("tier")}
-            >
-              Info
-            </button>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button
+                className="btn ghost"
+                style={{ fontSize: "12px", padding: "4px 8px" }}
+                onClick={() => {
+                  setModalData({ step: 1 });
+                  setActiveModal("onboarding");
+                }}
+              >
+                Change topics
+              </button>
+              <button
+                className="btn ghost"
+                style={{ fontSize: "12px", padding: "4px 10px" }}
+                onClick={() => setActiveModal("tier")}
+              >
+                Info
+              </button>
+            </div>
           </div>
 
           <div className="gauge">

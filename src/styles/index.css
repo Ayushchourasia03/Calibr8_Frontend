@@ -1830,3 +1830,223 @@ details[open] summary {
 :root[data-skin=racer] .orb {
   background: radial-gradient(circle at 30% 28%, #FF6B6B, transparent 58%), conic-gradient(from 200deg, #FF1E1E, #FFB000, #7A0A0A, #FF1E1E) !important;
 }
+
+/* ==========================================================================
+   Pixel-Perfect Onboarding & Auth Modal (matching HTML & screenshots)
+   ========================================================================== */
+.sheet.onboard {
+  position: relative;
+  width: min(540px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  border-radius: 28px !important;
+  padding: 28px 26px !important;
+  background: linear-gradient(150deg, #dce2ed 0%, #cbd2e0 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 40px 90px -20px rgba(10, 15, 30, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  color: #14152b !important;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  animation: pop 0.35s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+.sheet.onboard h2 {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: #0f1424 !important;
+  margin: 0 0 6px !important;
+  font-family: 'Space Grotesk', system-ui, sans-serif !important;
+  letter-spacing: -0.02em !important;
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
+}
+.sheet.onboard .mu {
+  color: #55627f !important;
+  font-size: 13.5px !important;
+  line-height: 1.5 !important;
+}
+.sheet.onboard .x {
+  position: absolute !important;
+  right: 16px !important;
+  top: 16px !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: #ffffff !important;
+  color: #0f1424 !important;
+  font-size: 18px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06) !important;
+  transition: transform 0.15s !important;
+}
+.sheet.onboard .x:hover {
+  transform: scale(1.05) !important;
+}
+.sheet.onboard .dots {
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 2px 0 4px !important;
+}
+.sheet.onboard .dots i {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: #9aa8c3 !important;
+  transition: all 0.3s ease !important;
+  display: inline-block !important;
+}
+.sheet.onboard .dots i.on {
+  width: 28px !important;
+  border-radius: 6px !important;
+  background: linear-gradient(90deg, #2F7BFF, #B16BFF) !important;
+}
+.sheet.onboard .dots i.done {
+  background: #2F7BFF !important;
+}
+.sheet.onboard .step-txt {
+  font-size: 12px !important;
+  color: #55627f !important;
+  text-align: center !important;
+  margin: 4px 0 14px !important;
+  font-weight: 500 !important;
+}
+.sheet.onboard .onboard-banner {
+  background: rgba(165, 185, 220, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+  color: #1e293b !important;
+  margin-bottom: 14px !important;
+  font-weight: 500 !important;
+}
+.sheet.onboard input[type="email"],
+.sheet.onboard input[type="password"],
+.sheet.onboard input[type="text"] {
+  background: #ffffff !important;
+  color: #0f1424 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+  margin-top: 4px !important;
+  margin-bottom: 10px !important;
+}
+.sheet.onboard input:focus {
+  outline: 2px solid #2F7BFF !important;
+  border-color: transparent !important;
+}
+.sheet.onboard select {
+  background: #ffffff !important;
+  color: #0f1424 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border-radius: 10px !important;
+  padding: 12px 14px !important;
+  font-size: 15px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+  cursor: pointer !important;
+}
+.sheet.onboard .btn-dark {
+  background: #0f1424 !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+  padding: 10px 24px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 14px rgba(15, 20, 36, 0.25) !important;
+  transition: transform 0.15s, opacity 0.15s !important;
+}
+.sheet.onboard .btn-dark:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+}
+.sheet.onboard .btn-dark:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+.sheet.onboard .btn-white {
+  background: #ffffff !important;
+  color: #0f1424 !important;
+  border-radius: 999px !important;
+  padding: 8px 18px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04) !important;
+  transition: transform 0.15s !important;
+}
+.sheet.onboard .btn-white:hover {
+  transform: translateY(-1px) !important;
+}
+.sheet.onboard .or {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  color: #64748b !important;
+  font-size: 13px !important;
+  margin: 14px 0 !important;
+}
+.sheet.onboard .or:before,
+.sheet.onboard .or:after {
+  content: '' !important;
+  flex: 1 !important;
+  height: 1px !important;
+  background: rgba(0, 0, 0, 0.12) !important;
+}
+.sheet.onboard .topic-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 0 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+.sheet.onboard .topic-pill {
+  background: #0f1424 !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+  padding: 6px 18px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.15s !important;
+}
+.sheet.onboard .topic-pill.off {
+  background: #ffffff !important;
+  color: #64748b !important;
+  border: 1px dashed rgba(0, 0, 0, 0.25) !important;
+}
+.sheet.onboard .level-group {
+  display: flex !important;
+  gap: 4px !important;
+}
+.sheet.onboard .level-btn {
+  background: #ffffff !important;
+  color: #0f1424 !important;
+  border-radius: 6px !important;
+  padding: 5px 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  cursor: pointer !important;
+  transition: all 0.15s !important;
+}
+.sheet.onboard .level-btn.on {
+  background: #0f1424 !important;
+  color: #ffffff !important;
+  border-color: #0f1424 !important;
+  font-weight: 600 !important;
+}
+

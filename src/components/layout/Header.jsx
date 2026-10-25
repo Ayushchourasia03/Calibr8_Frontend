@@ -93,7 +93,10 @@ export function Header() {
         <button
           className="btn ghost"
           id="acct"
-          onClick={() => setActiveModal("onboarding")}
+          onClick={() => {
+            setModalData({ step: state.user && !state.user.guest ? 1 : 0 });
+            setActiveModal("onboarding");
+          }}
         >
           {accountLabel}
         </button>

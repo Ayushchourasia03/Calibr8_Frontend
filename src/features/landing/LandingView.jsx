@@ -6,8 +6,9 @@ export function LandingView() {
     state,
     setView,
     toggleThemeMode,
-    setAuthModalOpen,
-    setAuthMode,
+    setActiveModal,
+    setModalData,
+    login,
   } = useCalibr8();
   const heroRef = useRef(null);
 
@@ -22,19 +23,28 @@ export function LandingView() {
     if (state.started) {
       setView("home");
     } else {
-      setAuthMode("register");
-      setAuthModalOpen(true);
+      setModalData({ step: 0, authMode: "register" });
+      setActiveModal("onboarding");
     }
   };
 
   const handleOpenLogin = () => {
-    setAuthMode("login");
-    setAuthModalOpen(true);
+    setModalData({ step: 0, authMode: "login" });
+    setActiveModal("onboarding");
   };
 
   const handleOpenRegister = () => {
-    setAuthMode("register");
-    setAuthModalOpen(true);
+    setModalData({ step: 0, authMode: "register" });
+    setActiveModal("onboarding");
+  };
+
+  const handleExploreDemo = async () => {
+    try {
+      await login({ email: "jane@example.com", password: "password123" });
+    } catch (err) {
+      console.warn("Demo account sign-in fallback:", err);
+    }
+    setView("home");
   };
 
   return (
@@ -71,7 +81,7 @@ export function LandingView() {
             </button>
             <button
               className="btn ghost"
-              onClick={() => setView("home")}
+              onClick={handleExploreDemo}
             >
               Explore a demo
             </button>

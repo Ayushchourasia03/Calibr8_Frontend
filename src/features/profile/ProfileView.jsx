@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { ymd } from "../../utils/tierUtils";
+import { ConnectedAccounts } from "./ConnectedAccounts";
 
 const AVATARS = [
   "🙂", "😎", "🤓", "🧑‍💻", "👩‍💻", "🧑‍🚀", "🦊", "🐼", "🚀", "🎮",
@@ -14,14 +15,16 @@ export function ProfileView() {
     showToast,
     updateProfileName,
     updateAcademicProfile,
+    setActiveModal,
+    setModalData,
+    logout,
   } = useCalibr8();
   const [activityMode, setActivityMode] = useState("y"); // 'y' = year (heat), 'm' = monthly (mbar)
 
+  const isGuest = !state.user || state.user.guest;
   const myName =
     state.name ||
-    (state.user && !state.user.guest
-      ? state.user.email?.split("@")[0]
-      : "Learner");
+    (!isGuest ? state.user.email?.split("@")[0] : "Learner");
 
   // 53-week heatmap
   const n = new Date();
@@ -171,6 +174,83 @@ export function ProfileView() {
           <span className="tbg" style={{ "--tc": tierInfo.color }}>
             {tierInfo.full}
           </span>
+        </div>
+      </div>
+
+      {/* Account & Calibration Bar */}
+      <div
+        className="card"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "12px",
+          marginBottom: "16px",
+          background: "rgba(255, 255, 255, 0.04)",
+          border: "1px solid var(--ln)",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: 700 }}>
+            {isGuest ? (
+              <span>Guest Account</span>
+            ) : (
+              <span>
+                Signed in as <b>{state.user.email}</b>
+              </span>
+            )}
+          </div>
+          <div className="mu" style={{ fontSize: "12px" }}>
+            Editor language: <b>{state.lang || "Python"}</b> • Calibrated topics:{" "}
+            <b>{Object.keys(state.levels || {}).length}</b>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <button
+            className="btn ghost"
+            style={{ fontSize: "12px", padding: "5px 12px" }}
+            onClick={() => {
+              setModalData({ step: 1 });
+              setActiveModal("onboarding");
+            }}
+          >
+            🎯 Calibrate Topics
+          </button>
+          <button
+            className="btn ghost"
+            style={{ fontSize: "12px", padding: "5px 12px" }}
+            onClick={() => {
+              setModalData({ step: 2 });
+              setActiveModal("onboarding");
+            }}
+          >
+            ⚙️ Language ({state.lang || "Python"})
+          </button>
+          {isGuest ? (
+            <button
+              className="btn"
+              style={{ fontSize: "12px", padding: "5px 12px" }}
+              onClick={() => {
+                setModalData({ step: 0 });
+                setActiveModal("onboarding");
+              }}
+            >
+              Log in / Register
+            </button>
+          ) : (
+            <button
+              className="btn ghost"
+              style={{ fontSize: "12px", padding: "5px 12px", borderColor: "rgba(255, 107, 129, 0.4)", color: "#ff6b81" }}
+              onClick={async () => {
+                await logout();
+                showToast("Signed out successfully.");
+              }}
+            >
+              Sign out
+            </button>
+          )}
         </div>
       </div>
 
@@ -325,6 +405,16 @@ export function ProfileView() {
             })}
           </svg>
         </div>
+      </div>
+
+      {/* Connected Accounts Section */}
+      <div style={{ marginBottom: "16px" }}>
+        <ConnectedAccounts
+          onRequireAuth={() => {
+            setModalData({ step: 0 });
+            setActiveModal("onboarding");
+          }}
+        />
       </div>
 
       {/* Share Cards Row */}
