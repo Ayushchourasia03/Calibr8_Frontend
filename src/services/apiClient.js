@@ -759,11 +759,12 @@ export async function request(endpoint, options = {}) {
   } catch (networkOrResponseError) {
     // If backend offline or connection refused, use seamless in-memory fallback
     if (
-      (!disableMockFallback && networkOrResponseError.isNetworkError) ||
-      networkOrResponseError.name === "TypeError" ||
-      networkOrResponseError.message?.includes("Failed to fetch") ||
-      networkOrResponseError.message?.includes("NetworkError") ||
-      networkOrResponseError.status === 404
+      !disableMockFallback &&
+      (networkOrResponseError.isNetworkError ||
+        networkOrResponseError.name === "TypeError" ||
+        networkOrResponseError.message?.includes("Failed to fetch") ||
+        networkOrResponseError.message?.includes("NetworkError") ||
+        networkOrResponseError.status === 404)
     ) {
       return handleMockFallback(endpoint, requestOptions);
     }
