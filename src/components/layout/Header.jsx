@@ -42,7 +42,7 @@ export function Header() {
   const accountLabel = state.user
     ? state.user.guest
       ? "Guest"
-      : state.user.email?.split("@")[0] || "Account"
+      : state.user.name || state.user.email?.split("@")[0] || "Account"
     : "Guest";
 
   return (

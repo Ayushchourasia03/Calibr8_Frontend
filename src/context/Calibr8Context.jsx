@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useCallback } from "react";
 import {
   DEFAULT_QUESTION,
   BANK,
@@ -6,7 +6,12 @@ import {
 } from "../data/constants";
 import { SKINS } from "../data/themesData";
 import { getTierInfo } from "../utils/tierUtils";
-import { analyzeCode, formatTimeComplexity, formatSpaceComplexity } from "../utils/codeAnalyzer";
+import {
+  analyzeCode,
+  formatTimeComplexity,
+  formatSpaceComplexity,
+} from "../utils/codeAnalyzer";
+import { api, tokenStorage } from "../services/api";
 
 const STORAGE_KEY = "calibr8-v1";
 
@@ -93,11 +98,25 @@ export function Calibr8Provider({ children }) {
   const [toastMessage, setToastMessage] = useState(null);
 
   // Modals state
-  const [activeModal, setActiveModal] = useState(null); // 'onboarding' | 'level' | 'tier' | 'stat' | 'track' | 'video'
+  const [activeModal, setActiveModal] = useState(null);
   const [modalData, setModalData] = useState(null);
+
+  // Auth modal state for quick sign-in triggers
+  const [isAuthModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
 
   // Skin preview state
   const [previewSkinId, setPreviewSkinId] = useState(null);
+
+  // Backend connectivity status
+  const [backendConnected, setBackendConnected] = useState(false);
+
+  const showToast = useCallback((message) => {
+    setToastMessage(message);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3200);
+  }, []);
 
   // Sync skin and theme attributes to HTML root
   useEffect(() => {
@@ -115,12 +134,89 @@ export function Calibr8Provider({ children }) {
     }
   }, [state]);
 
-  const showToast = (message) => {
-    setToastMessage(message);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3000);
-  };
+  // Check backend health & sync authenticated user on app load
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkBackendAndUser() {
+      try {
+        const healthRes = await api.system.health();
+        if (isMounted && (healthRes.status === "ok" || healthRes.success)) {
+          setBackendConnected(true);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setBackendConnected(false);
+          console.warn("[Calibr8] Backend at localhost:3000 not reachable:", err.message);
+        }
+      }
+
+      // Check existing auth token
+      const token = tokenStorage.get();
+      if (!token) return;
+
+      try {
+        const authRes = await api.auth.getMe();
+        if (isMounted && authRes?.success && authRes.user) {
+          const u = authRes.user;
+          setState((s) => ({
+            ...s,
+            user: u,
+            name: u.name || s.name,
+            college: u.college || s.college,
+            rating: u.rating ?? s.rating,
+            score: u.score ?? s.score,
+            streak: u.streak ?? s.streak,
+            coins: u.coins ?? s.coins,
+            started: u.onboarded || s.started,
+          }));
+
+          // Sync solved problems list from backend
+          try {
+            const solvedRes = await api.users.getSolvedProblems();
+            if (isMounted && solvedRes?.data) {
+              const solvedMap = {};
+              solvedRes.data.forEach((p) => {
+                if (p.isSolved) {
+                  solvedMap[p.slug || p.number] = true;
+                }
+              });
+              setState((s) => ({
+                ...s,
+                solved: { ...s.solved, ...solvedMap },
+              }));
+            }
+          } catch {
+            // ignore
+          }
+
+          // Sync user theme status from backend
+          try {
+            const themeRes = await api.themes.getMe();
+            if (isMounted && themeRes?.success) {
+              setState((s) => ({
+                ...s,
+                coins: themeRes.coins ?? s.coins,
+                skin: themeRes.activeTheme || s.skin,
+                ownedSkins: themeRes.ownedThemes || s.ownedSkins,
+              }));
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } catch (authErr) {
+        console.warn("Session expired or invalid:", authErr.message);
+        tokenStorage.remove();
+      }
+    }
+
+    checkBackendAndUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const getTopicRating = (topic) => {
     return state.ratings?.[topic] ?? [800, 1200, 1600][state.levels?.[topic] || 0];
@@ -136,7 +232,7 @@ export function Calibr8Provider({ children }) {
   const createQuestion = (isStretch = false) => {
     const L = state.levels || { Arrays: 1 };
     const ts = Object.keys(L).sort(
-      (a, b) => getTopicRating(a) - getTopicRating(b),
+      (a, b) => getTopicRating(a) - getTopicRating(b)
     );
     const topic = ts[(isStretch ? (state.stretchN || 0) + 1 : 0) % ts.length] || "Arrays";
     const lvl = L[topic] ?? 1;
@@ -146,6 +242,7 @@ export function Calibr8Provider({ children }) {
     return {
       topic,
       l: lvl,
+      difficulty: lvl,
       d: Math.round(getTopicRating(topic) - 147 + (isStretch ? 120 : 0)),
       title: `${b[0]} (${DIFFICULTY_LABELS[lvl]})`,
       text: b[1],
@@ -154,6 +251,7 @@ export function Calibr8Provider({ children }) {
         : "See the statement details.",
       pts: [10, 25, 50][lvl],
       key: `${topic}_${lvl}_${isStretch ? "s" + state.stretchN : "d"}_${state.dayStamp}`,
+      slug: `daily-${topic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
       hints: isSw
         ? DEFAULT_QUESTION.hints
         : [
@@ -180,17 +278,25 @@ export function Calibr8Provider({ children }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const setTopicLevel = (topic, level) => {
+  // Sync topic calibration to local state + backend API (/api/onboarding)
+  const setTopicLevel = async (topic, level) => {
     setState((s) => {
-      const nextLevels = { ...s.levels, [topic]: level };
-      const nextRatings = {
-        ...s.ratings,
-        [topic]: [800, 1200, 1600][level],
-      };
+      const nextLevels = { ...s.levels };
+      const nextRatings = { ...s.ratings };
+
+      if (level === null || level === undefined) {
+        delete nextLevels[topic];
+        delete nextRatings[topic];
+      } else {
+        nextLevels[topic] = level;
+        nextRatings[topic] = [800, 1200, 1600][level];
+      }
+
       const keys = Object.keys(nextRatings);
-      const nextOverall = Math.round(
-        keys.reduce((acc, k) => acc + nextRatings[k], 0) / keys.length,
-      );
+      const nextOverall = keys.length
+        ? Math.round(keys.reduce((acc, k) => acc + nextRatings[k], 0) / keys.length)
+        : s.rating || 1200;
+
       return {
         ...s,
         levels: nextLevels,
@@ -198,6 +304,23 @@ export function Calibr8Provider({ children }) {
         rating: nextOverall,
       };
     });
+
+    // If authenticated, sync topic levels with backend API
+    if (tokenStorage.get()) {
+      try {
+        const topicSelections = Object.entries({
+          ...state.levels,
+          ...(level !== null && level !== undefined ? { [topic]: level } : {}),
+        }).map(([tName, lvl]) => ({
+          topicId: tName.toLowerCase().replace(/\s+/g, "-"),
+          difficulty: ["easy", "medium", "hard"][lvl] || "medium",
+        }));
+
+        await api.onboarding.submit({ topicSelections });
+      } catch (err) {
+        console.warn("Backend calibration sync note:", err.message);
+      }
+    }
   };
 
   const toggleThemeMode = () => {
@@ -207,15 +330,40 @@ export function Calibr8Provider({ children }) {
     }));
   };
 
-  const buyOrApplySkin = (skinId) => {
+  // Purchase or apply theme with backend API integration (/api/themes)
+  const buyOrApplySkin = async (skinId) => {
     const skin = SKINS[skinId];
-    if (!skin) return;
+    if (!skin) return false;
     const owned = state.ownedSkins || ["default"];
-    if (!owned.includes(skinId)) {
+    const isOwned = owned.includes(skinId);
+
+    if (!isOwned) {
       if (state.coins < skin.price) {
         showToast(`Not enough coins! This theme requires ${skin.price} coins.`);
         return false;
       }
+
+      // Try purchasing on backend if connected
+      if (tokenStorage.get()) {
+        try {
+          const res = await api.themes.buyTheme(skinId);
+          if (res?.coins !== undefined) {
+            setState((s) => ({
+              ...s,
+              coins: res.coins,
+              ownedSkins: [...owned, skinId],
+              skin: skinId,
+            }));
+            setPreviewSkinId(null);
+            showToast(`Purchased & applied ${skin.name} theme!`);
+            return true;
+          }
+        } catch (apiErr) {
+          console.warn("Backend theme buy fallback:", apiErr.message);
+        }
+      }
+
+      // Local state fallback
       setState((s) => ({
         ...s,
         coins: s.coins - skin.price,
@@ -226,6 +374,15 @@ export function Calibr8Provider({ children }) {
       showToast(`Purchased & applied ${skin.name} theme!`);
       return true;
     } else {
+      // Apply theme
+      if (tokenStorage.get()) {
+        try {
+          await api.themes.applyTheme(skinId);
+        } catch (apiErr) {
+          console.warn("Backend theme apply fallback:", apiErr.message);
+        }
+      }
+
       setState((s) => ({
         ...s,
         skin: skinId,
@@ -236,16 +393,22 @@ export function Calibr8Provider({ children }) {
     }
   };
 
-  const openProblemInSolver = (problem) => {
-    setCurrentQ({
-      topic: problem.t,
-      l: problem.l,
-      d: problem.d,
-      title: `${problem.title} (${DIFFICULTY_LABELS[problem.l]})`,
-      text: `A ${DIFFICULTY_LABELS[problem.l].toLowerCase()} ${problem.t} problem from the Calibr8 catalog. Solve it with optimal time and space complexity.`,
+  // Open Problem in Solver with live backend templates & visible testcases if available
+  const openProblemInSolver = async (problem) => {
+    const slug = problem.slug || `prob-${problem.id}`;
+
+    // Base fallback question structure
+    let questionData = {
+      topic: problem.t || problem.topic || "Arrays",
+      l: problem.l ?? 0,
+      difficulty: problem.l ?? 0,
+      d: problem.d || 1200,
+      title: `${problem.title} (${DIFFICULTY_LABELS[problem.l ?? 0]})`,
+      text: `A ${DIFFICULTY_LABELS[problem.l ?? 0].toLowerCase()} ${problem.t || "DSA"} problem from the Calibr8 catalog. Solve it with optimal time and space complexity.`,
       ex: "Read constraints and implement the requested algorithm.",
-      pts: problem.pts,
+      pts: problem.pts || [10, 25, 50][problem.l ?? 0],
       key: `c${problem.id}`,
+      slug,
       hints: [
         "Think about what you must track as you scan the input.",
         "Name the pattern that keeps that information cheaply.",
@@ -253,9 +416,158 @@ export function Calibr8Provider({ children }) {
       ],
       trace: [["Step 1", "[init]", "0", "0", "0"]],
       stretch: false,
-    });
+    };
+
+    // Attempt to fetch full details & starter templates from backend (/api/problems/:slug)
+    try {
+      const res = await api.problems.getBySlug(slug);
+      if (res?.data) {
+        const d = res.data;
+        questionData = {
+          ...questionData,
+          title: d.title ? `${d.title} (${d.difficulty})` : questionData.title,
+          text: d.description || questionData.text,
+          difficulty: d.difficulty === "Easy" ? 0 : d.difficulty === "Hard" ? 2 : 1,
+          testcases: d.testcases || [],
+          templates: d.templates || {},
+        };
+      }
+    } catch {
+      // Use local catalog data
+    }
+
+    setCurrentQ(questionData);
     setState((s) => ({ ...s, att: null }));
     setView("solve");
+  };
+
+  // --- Backend Authentication API Integration ---
+  const login = async ({ email, password }) => {
+    const res = await api.auth.login({ email, password });
+    if (res?.success && res.user) {
+      const u = res.user;
+      setState((s) => ({
+        ...s,
+        user: u,
+        name: u.name || s.name,
+        college: u.college || s.college,
+        rating: u.rating ?? s.rating,
+        score: u.score ?? s.score,
+        streak: u.streak ?? s.streak,
+        coins: u.coins ?? s.coins,
+        started: u.onboarded || s.started,
+      }));
+    }
+    return res;
+  };
+
+  const register = async ({ name, email, password, role = "user" }) => {
+    const res = await api.auth.register({ name, email, password, role });
+    if (res?.success && res.user) {
+      const u = res.user;
+      setState((s) => ({
+        ...s,
+        user: u,
+        name: u.name || s.name,
+        college: u.college || s.college,
+        rating: u.rating ?? s.rating,
+        score: u.score ?? s.score,
+        coins: u.coins ?? s.coins,
+        started: u.onboarded || s.started,
+      }));
+    }
+    return res;
+  };
+
+  const logout = async () => {
+    await api.auth.logout();
+    setState((s) => ({
+      ...s,
+      user: null,
+    }));
+  };
+
+  const refreshUser = async () => {
+    const res = await api.users.getProfile();
+    if (res?.success && res.user) {
+      const u = res.user;
+      setState((s) => ({
+        ...s,
+        user: u,
+        name: u.name || s.name,
+        college: u.college || s.college,
+        rating: u.rating ?? s.rating,
+        score: u.score ?? s.score,
+        streak: u.streak ?? s.streak,
+        coins: u.coins ?? s.coins,
+      }));
+      return u;
+    }
+    return null;
+  };
+
+  const updateProfileName = async (name) => {
+    setState((s) => ({ ...s, name }));
+    if (tokenStorage.get()) {
+      try {
+        const res = await api.users.updateName({ name });
+        if (res?.user) {
+          setState((s) => ({ ...s, user: { ...s.user, ...res.user } }));
+        }
+      } catch (err) {
+        console.warn("Backend name update note:", err.message);
+      }
+    }
+  };
+
+  const updateAcademicProfile = async (academic) => {
+    setState((s) => ({ ...s, ...academic }));
+    if (tokenStorage.get()) {
+      try {
+        await api.users.updateAcademic(academic);
+      } catch (err) {
+        console.warn("Backend academic update note:", err.message);
+      }
+    }
+  };
+
+  const updateLanguage = async (language) => {
+    setState((s) => ({ ...s, lang: language }));
+    if (tokenStorage.get()) {
+      try {
+        await api.users.updateLanguage({ language });
+      } catch (err) {
+        console.warn("Backend language update note:", err.message);
+      }
+    }
+  };
+
+  const saveOnboarding = async (payload) => {
+    if (tokenStorage.get()) {
+      return await api.onboarding.submit(payload);
+    }
+    return null;
+  };
+
+  // Run code against backend execution sandbox (/api/execution/runs)
+  const runCode = async ({ slug, problemId, language, code }) => {
+    return await api.execution.run({ slug, problemId, language, code });
+  };
+
+  // Submit code for judging with backend polling (/api/execution/submissions)
+  const submitCode = async ({ slug, problemId, language, code, onProgress }) => {
+    const submission = await api.execution.submit({
+      slug,
+      problemId,
+      language,
+      code,
+    });
+    if (submission?.submissionId) {
+      return await api.execution.pollSubmission(submission.submissionId, {
+        onProgress,
+      });
+    }
+    return submission;
   };
 
   return (
@@ -263,6 +575,8 @@ export function Calibr8Provider({ children }) {
       value={{
         state,
         setState,
+        user: state.user,
+        setUser: (u) => setState((s) => ({ ...s, user: u })),
         currentQ,
         setCurrentQ,
         activeModal,
@@ -285,6 +599,24 @@ export function Calibr8Provider({ children }) {
         analyzeCode,
         formatTimeComplexity,
         formatSpaceComplexity,
+        // Backend API integrations
+        backendConnected,
+        login,
+        register,
+        logout,
+        refreshUser,
+        updateProfileName,
+        updateAcademicProfile,
+        updateLanguage,
+        saveOnboarding,
+        runCode,
+        submitCode,
+        // Auth modal controls
+        isAuthModalOpen,
+        setAuthModalOpen,
+        authMode,
+        setAuthMode,
+        api,
       }}
     >
       {children}

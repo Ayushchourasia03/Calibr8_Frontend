@@ -7,7 +7,14 @@ const AVATARS = [
 ];
 
 export function ProfileView() {
-  const { state, setState, tierInfo, showToast } = useCalibr8();
+  const {
+    state,
+    setState,
+    tierInfo,
+    showToast,
+    updateProfileName,
+    updateAcademicProfile,
+  } = useCalibr8();
   const [activityMode, setActivityMode] = useState("y"); // 'y' = year (heat), 'm' = monthly (mbar)
 
   const myName =
@@ -114,6 +121,7 @@ export function ProfileView() {
               value={state.name || ""}
               placeholder="Your full name"
               onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
+              onBlur={(e) => updateProfileName(e.target.value.trim())}
               style={{ fontSize: "16px", fontWeight: "bold", padding: "6px 10px" }}
             />
           </div>
@@ -124,6 +132,7 @@ export function ProfileView() {
               value={state.college || ""}
               placeholder="College / Organization name"
               onChange={(e) => setState((s) => ({ ...s, college: e.target.value }))}
+              onBlur={(e) => updateAcademicProfile({ college: e.target.value.trim() })}
               style={{ fontSize: "13px", padding: "5px 10px", width: "100%", maxWidth: "300px" }}
             />
           </div>

@@ -1,22 +1,26 @@
 import { useEffect, useState } from "react";
+import { api } from "../../services/api";
 
 export default function SocialConnect({ user }) {
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-  const token = localStorage.getItem("token");
-  const headers = { Authorization: `Bearer ${token}` };
-
   const [accounts, setAccounts] = useState(user?.socialAccounts || []);
-  const githubConnected = accounts.find(a => a.provider === "github");
+  const githubConnected = accounts.find((a) => a.provider === "github");
 
   const connect = async (provider) => {
-    const res = await fetch(`${API}/api/social/${provider}/link-url`, { headers });
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
+    try {
+      const data = await api.social.getLinkUrl(provider);
+      if (data?.url) window.location.href = data.url;
+    } catch (err) {
+      console.warn("Could not start linking:", err.message);
+    }
   };
 
   const disconnect = async (provider) => {
-    await fetch(`${API}/api/social/${provider}`, { method: "DELETE", headers });
-    setAccounts(prev => prev.filter(a => a.provider !== provider));
+    try {
+      await api.social.unlink(provider);
+      setAccounts((prev) => prev.filter((a) => a.provider !== provider));
+    } catch (err) {
+      console.warn("Could not unlink:", err.message);
+    }
   };
 
   useEffect(() => {

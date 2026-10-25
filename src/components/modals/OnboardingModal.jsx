@@ -12,6 +12,10 @@ export function OnboardingModal() {
     setView,
     setCurrentQ,
     showToast,
+    login,
+    register,
+    saveOnboarding,
+    updateLanguage,
   } = useCalibr8();
 
   const [step, setStep] = useState(0);
@@ -26,13 +30,34 @@ export function OnboardingModal() {
     setStep(1);
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+    const cleanEmail = email.trim();
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
       showToast("Please enter a valid email address.");
       return;
     }
-    setState((s) => ({ ...s, user: { guest: false, email: email.trim() } }));
+
+    try {
+      // Attempt login with backend API
+      await login({ email: cleanEmail, password: "Password123!" });
+      showToast("Signed in successfully.");
+    } catch {
+      // If login fails, attempt auto-registration for onboarding
+      try {
+        const username = cleanEmail.split("@")[0];
+        await register({
+          name: username.charAt(0).toUpperCase() + username.slice(1),
+          email: cleanEmail,
+          password: "Password123!",
+        });
+        showToast("Account created & synced.");
+      } catch {
+        // Fallback to local session if backend offline
+        setState((s) => ({ ...s, user: { guest: false, email: cleanEmail } }));
+      }
+    }
+
     setStep(1);
   };
 
@@ -49,7 +74,7 @@ export function OnboardingModal() {
     }));
   };
 
-  const handleFinish = (selectedLang) => {
+  const handleFinish = async (selectedLang) => {
     const k = Object.keys(state.levels || {});
     if (!k.length) {
       showToast("Please choose at least one topic.");
@@ -69,9 +94,22 @@ export function OnboardingModal() {
       lang: selectedLang,
     }));
 
+    // Persist onboarding calibration to backend API (/api/onboarding)
+    try {
+      const topicSelections = Object.entries(state.levels || {}).map(([topic, lvl]) => ({
+        topicId: topic.toLowerCase().replace(/\s+/g, "-"),
+        difficulty: ["easy", "medium", "hard"][lvl] || "medium",
+      }));
+      await saveOnboarding({ topicSelections });
+      await updateLanguage(selectedLang.toLowerCase().replace(/[^a-z]/g, ""));
+    } catch (err) {
+      console.warn("Backend onboarding sync note:", err.message);
+    }
+
     // Diagnostic starting question
     setCurrentQ({
       key: "diag_1",
+      slug: `diag-${firstTopic.toLowerCase()}`,
       title: `${firstTopic}: Frontier Diagnostic`,
       topic: firstTopic,
       d: avgRating,

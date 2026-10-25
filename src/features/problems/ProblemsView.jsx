@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import { PROBLEMS_CATALOG } from "../../data/problemsCatalog";
-import { TOPS, DIFFICULTY_LABELS } from "../../data/constants";
+import { DIFFICULTY_LABELS } from "../../data/constants";
+import { api } from "../../services/api";
 
 export function ProblemsView() {
   const { state, openProblemInSolver } = useCalibr8();
@@ -13,42 +13,192 @@ export function ProblemsView() {
   const [selectedSort, setSelectedSort] = useState("rec");
   const [page, setPage] = useState(0);
 
+  const [problems, setProblems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [solvedStatusMap, setSolvedStatusMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const PAGE_SIZE = 25;
 
-  // Stats calculation
+  // 1. Fetch DSA categories and user solve status from BE
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchMetadata() {
+      try {
+        const catRes = await api.topics.getCategories();
+        if (isMounted && Array.isArray(catRes)) {
+          setCategories(catRes);
+        }
+      } catch (err) {
+        console.warn("Could not fetch categories from BE:", err.message);
+      }
+
+      try {
+        const solvedRes = await api.users.getSolvedProblems();
+        if (isMounted && solvedRes?.data && Array.isArray(solvedRes.data)) {
+          const sMap = {};
+          solvedRes.data.forEach((p) => {
+            if (p.isSolved) {
+              sMap[p.slug || p.number] = true;
+              sMap[p.number] = true;
+              sMap[p.name] = true;
+            }
+          });
+          setSolvedStatusMap(sMap);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    fetchMetadata();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 2. Fetch problems list from BE when search, difficulty, or category changes
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchProblems() {
+      setLoading(true);
+      setError(null);
+
+      const diffParam =
+        selectedDifficulty === 0
+          ? "Easy"
+          : selectedDifficulty === 1
+            ? "Medium"
+            : selectedDifficulty === 2
+              ? "Hard"
+              : undefined;
+
+      try {
+        let rawList = [];
+
+        // If a specific topic slug is selected, call dedicated topic problems API
+        if (selectedTopic) {
+          try {
+            const topicRes = await api.topics.getCategoryProblems(selectedTopic, {
+              difficulty: diffParam,
+              search: query || undefined,
+            });
+            rawList = topicRes?.problems || [];
+          } catch {
+            // fallback to general problems API
+            const res = await api.problems.getAll({
+              difficulty: diffParam,
+              search: query || undefined,
+            });
+            rawList = res?.data || [];
+          }
+        } else {
+          // General problem catalog dedicated API: GET /api/problems
+          const res = await api.problems.getAll({
+            difficulty: diffParam,
+            search: query || undefined,
+          });
+          rawList = res?.data || [];
+        }
+
+        if (isMounted) {
+          if (Array.isArray(rawList)) {
+            const mapped = rawList.map((p, idx) => {
+              const diffStr = (p.difficulty || "Easy").toLowerCase();
+              const l = diffStr === "hard" ? 2 : diffStr === "medium" ? 1 : 0;
+              const probNum = p.problemNumber || p.number || idx + 1;
+              const slug = p.slug || `prob-${probNum}`;
+              const topicName =
+                p.topic ||
+                (p.tags && p.tags[0]) ||
+                (categories.find((c) => c.slug === selectedTopic)?.name) ||
+                "DSA Fundamentals";
+
+              return {
+                id: probNum,
+                problemNumber: probNum,
+                slug,
+                title: p.title || p.name || `Problem #${probNum}`,
+                t: topicName,
+                l,
+                d: l === 0 ? 1100 : l === 1 ? 1350 : 1700,
+                ac: p.solvedPercentage || 68 + ((probNum * 7) % 25),
+                pts: [10, 25, 50][l],
+                timeLimit: p.timeLimit,
+                memoryLimit: p.memoryLimit,
+                raw: p,
+              };
+            });
+            setProblems(mapped);
+          } else {
+            setProblems([]);
+          }
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.warn("Could not fetch problems from BE:", err.message);
+          setError("Failed to load problems from backend server.");
+          setProblems([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchProblems();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDifficulty, selectedTopic, query, categories]);
+
+  // Combined solved status
+  const userSolvedMap = useMemo(() => {
+    return {
+      ...(state.solved || {}),
+      ...solvedStatusMap,
+    };
+  }, [state.solved, solvedStatusMap]);
+
+  // Difficulty & Topic stats
   const stats = useMemo(() => {
     const total = [0, 0, 0];
     const solved = [0, 0, 0];
-    const sMap = state.solved || {};
-    PROBLEMS_CATALOG.forEach((p) => {
+    problems.forEach((p) => {
       total[p.l]++;
-      if (sMap[p.id]) solved[p.l]++;
+      if (userSolvedMap[p.id] || userSolvedMap[p.slug]) solved[p.l]++;
     });
     return { total, solved };
-  }, [state.solved]);
+  }, [problems, userSolvedMap]);
 
-  // Filtered and sorted problems
+  // Filtered and sorted problems on client (for status & sort orders)
   const filteredProblems = useMemo(() => {
     const q = query.trim().toLowerCase();
     const rr = (topic) => state.ratings?.[topic] ?? state.rating ?? 1200;
-    const sMap = state.solved || {};
     const uLevels = state.levels || {};
 
     const calcScore = (c) =>
       Math.abs(c.d - (rr(c.t) - 147)) +
       (c.t in uLevels ? 0 : 200) +
-      (sMap[c.id] ? 5000 : 0);
+      (userSolvedMap[c.id] || userSolvedMap[c.slug] ? 5000 : 0);
 
-    const result = PROBLEMS_CATALOG.filter((c) => {
-      if (selectedDifficulty >= 0 && c.l !== selectedDifficulty) return false;
-      if (selectedTopic && c.t !== selectedTopic) return false;
-      if (selectedStatus === "solved" && !sMap[c.id]) return false;
-      if (selectedStatus === "todo" && sMap[c.id]) return false;
+    const result = problems.filter((c) => {
+      const isSolved = userSolvedMap[c.id] || userSolvedMap[c.slug];
+      if (selectedStatus === "solved" && !isSolved) return false;
+      if (selectedStatus === "todo" && isSolved) return false;
+
       if (
         q &&
         !(
           c.title.toLowerCase().includes(q) ||
           c.t.toLowerCase().includes(q) ||
+          c.slug.toLowerCase().includes(q) ||
           `#${c.id}`.includes(q)
         )
       ) {
@@ -77,51 +227,46 @@ export function ProblemsView() {
 
     return result;
   }, [
+    problems,
     query,
-    selectedDifficulty,
-    selectedTopic,
     selectedStatus,
     selectedSort,
-    state.solved,
-    state.levels,
+    userSolvedMap,
     state.ratings,
     state.rating,
+    state.levels,
   ]);
 
-  const solvedMap = useMemo(() => state.solved || {}, [state.solved]);
   const totalPages = Math.max(1, Math.ceil(filteredProblems.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
   const rows = filteredProblems.slice(
     currentPage * PAGE_SIZE,
-    currentPage * PAGE_SIZE + PAGE_SIZE,
+    currentPage * PAGE_SIZE + PAGE_SIZE
   );
 
-  const recommendations =
-    selectedSort === "rec" && !query && currentPage === 0
-      ? filteredProblems.slice(0, 3)
-      : filteredProblems.slice(0, 3);
+  const recommendations = filteredProblems.slice(0, 3);
 
-  // Topics coverage
+  // Topics coverage breakdown
   const topicsCoverage = useMemo(() => {
     const map = {};
-    TOPS.forEach((t) => {
-      map[t] = { total: 0, solved: 0 };
-    });
-    PROBLEMS_CATALOG.forEach((p) => {
-      if (map[p.t]) {
-        map[p.t].total++;
-        if (solvedMap[p.id]) map[p.t].solved++;
+    problems.forEach((p) => {
+      if (!map[p.t]) {
+        map[p.t] = { total: 0, solved: 0 };
+      }
+      map[p.t].total++;
+      if (userSolvedMap[p.id] || userSolvedMap[p.slug]) {
+        map[p.t].solved++;
       }
     });
     return map;
-  }, [solvedMap]);
+  }, [problems, userSolvedMap]);
 
   return (
     <div>
       <div style={{ marginBottom: "14px" }}>
         <h1>Problems Catalog</h1>
         <p className="mu" style={{ margin: "4px 0" }}>
-          5,000 algorithmic challenges spanning 16 data structure & algorithm topics.
+          Live catalogue fetched from backend API. Filter by difficulty, category, status, or search keywords.
         </p>
       </div>
 
@@ -174,6 +319,7 @@ export function ProblemsView() {
                 </button>
               </div>
 
+              {/* Topic / DSA Category Dropdown */}
               <select
                 value={selectedTopic}
                 onChange={(e) => {
@@ -181,14 +327,38 @@ export function ProblemsView() {
                   setPage(0);
                 }}
               >
-                <option value="">All Topics (16)</option>
-                {TOPS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
+                <option value="">All Categories ({categories.length || "All"})</option>
+                {categories.length > 0
+                  ? categories.map((c) => (
+                      <option key={c.slug} value={c.slug}>
+                        {c.name} {c.totalProblems ? `(${c.totalProblems})` : ""}
+                      </option>
+                    ))
+                  : [
+                      "Arrays & Hashing",
+                      "Two Pointers",
+                      "Sliding Window",
+                      "Stack & Queue",
+                      "Binary Search",
+                      "Linked List",
+                      "Trees",
+                      "Tries",
+                      "Heap / Priority Queue",
+                      "Backtracking",
+                      "Graphs",
+                      "Advanced Graphs",
+                      "1-D Dynamic Programming",
+                      "2-D Dynamic Programming",
+                      "Greedy",
+                      "Intervals",
+                    ].map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
               </select>
 
+              {/* Status Filter */}
               <select
                 value={selectedStatus}
                 onChange={(e) => {
@@ -201,6 +371,7 @@ export function ProblemsView() {
                 <option value="solved">Solved Only</option>
               </select>
 
+              {/* Sort Order */}
               <select
                 value={selectedSort}
                 onChange={(e) => {
@@ -220,24 +391,47 @@ export function ProblemsView() {
 
           <div className="card">
             <h3>Topic Coverage</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "320px", overflowY: "auto" }}>
-              {TOPS.slice(0, 8).map((t) => {
-                const item = topicsCoverage[t] || { total: 1, solved: 0 };
-                const pct = Math.round((item.solved / item.total) * 100);
-                return (
-                  <div key={t}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "3px" }}>
-                      <span>{t}</span>
-                      <span className="mu">
-                        {item.solved}/{item.total}
-                      </span>
-                    </div>
-                    <div className="bar">
-                      <i style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+                maxHeight: "320px",
+                overflowY: "auto",
+              }}
+            >
+              {Object.keys(topicsCoverage).length > 0 ? (
+                Object.keys(topicsCoverage)
+                  .slice(0, 10)
+                  .map((t) => {
+                    const item = topicsCoverage[t] || { total: 1, solved: 0 };
+                    const pct = Math.round((item.solved / item.total) * 100);
+                    return (
+                      <div key={t}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: "12px",
+                            marginBottom: "3px",
+                          }}
+                        >
+                          <span>{t}</span>
+                          <span className="mu">
+                            {item.solved}/{item.total}
+                          </span>
+                        </div>
+                        <div className="bar">
+                          <i style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="mu" style={{ fontSize: "12px" }}>
+                  No topic data available
+                </div>
+              )}
             </div>
           </div>
         </aside>
@@ -245,7 +439,16 @@ export function ProblemsView() {
         {/* Center Column: Questions Table */}
         <section>
           <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "12px",
+                flexWrap: "wrap",
+                gap: "8px",
+              }}
+            >
               <h2>
                 Questions <b>({filteredProblems.length})</b>
               </h2>
@@ -257,73 +460,119 @@ export function ProblemsView() {
                   setPage(0);
                 }}
                 placeholder="Search by title, topic, #id..."
-                style={{ width: "220px", maxWidth: "100%", padding: "6px 12px", borderRadius: "999px" }}
+                style={{
+                  width: "220px",
+                  maxWidth: "100%",
+                  padding: "6px 12px",
+                  borderRadius: "999px",
+                }}
               />
             </div>
 
-            <table className="pl">
-              <thead>
-                <tr>
-                  <th style={{ width: "40px" }}>#</th>
-                  <th>Title</th>
-                  <th>Topic</th>
-                  <th>Diff</th>
-                  <th style={{ textAlign: "right" }}>Accept</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => {
-                  const isSolved = solvedMap[p.id];
-                  const diffClass = ["dE", "dM", "dH"][p.l];
-                  return (
-                    <tr
-                      key={p.id}
-                      data-id={p.id}
-                      onClick={() => openProblemInSolver(p)}
-                    >
-                      <td className="mu">{p.id}</td>
-                      <td>
-                        <b>{p.title}</b>
-                        {isSolved && (
-                          <span className="ok" style={{ marginLeft: "6px", fontSize: "12px" }}>
-                            ✓
-                          </span>
-                        )}
-                      </td>
-                      <td className="mu">{p.t}</td>
-                      <td>
-                        <span className={`dc ${diffClass}`}>
-                          {DIFFICULTY_LABELS[p.l]}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "right" }} className="mu">
-                        {p.ac}%
-                      </td>
+            {loading ? (
+              <div style={{ textAlign: "center", padding: "40px" }}>
+                <p className="mu">Fetching problem catalogue from backend...</p>
+              </div>
+            ) : error ? (
+              <div style={{ textAlign: "center", padding: "30px" }}>
+                <p className="bad">{error}</p>
+                <button
+                  className="btn ghost"
+                  style={{ marginTop: "10px" }}
+                  onClick={() => setSelectedDifficulty((d) => d)}
+                >
+                  Retry Connection
+                </button>
+              </div>
+            ) : rows.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px" }}>
+                <h3>No problems match the current filter</h3>
+                <p className="mu" style={{ margin: "6px 0 12px" }}>
+                  Try adjusting difficulty, search query, or status filter.
+                </p>
+                <button
+                  className="btn ghost"
+                  onClick={() => {
+                    setSelectedDifficulty(-1);
+                    setSelectedTopic("");
+                    setSelectedStatus("");
+                    setQuery("");
+                    setPage(0);
+                  }}
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            ) : (
+              <>
+                <table className="pl">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "40px" }}>#</th>
+                      <th>Title</th>
+                      <th>Topic</th>
+                      <th>Diff</th>
+                      <th style={{ textAlign: "right" }}>Accept</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {rows.map((p) => {
+                      const isSolved = userSolvedMap[p.id] || userSolvedMap[p.slug];
+                      const diffClass = ["dE", "dM", "dH"][p.l];
+                      return (
+                        <tr
+                          key={p.slug || p.id}
+                          data-id={p.id}
+                          onClick={() => openProblemInSolver(p)}
+                        >
+                          <td className="mu">{p.problemNumber || p.id}</td>
+                          <td>
+                            <b>{p.title}</b>
+                            {isSolved && (
+                              <span
+                                className="ok"
+                                style={{ marginLeft: "6px", fontSize: "12px" }}
+                              >
+                                ✓
+                              </span>
+                            )}
+                          </td>
+                          <td className="mu">{p.t}</td>
+                          <td>
+                            <span className={`dc ${diffClass}`}>
+                              {DIFFICULTY_LABELS[p.l]}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: "right" }} className="mu">
+                            {p.ac}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
 
-            <div className="pg">
-              <button
-                className="btn ghost"
-                disabled={currentPage <= 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                ‹ Prev
-              </button>
-              <span className="mu" style={{ fontSize: "13px" }}>
-                Page <b>{currentPage + 1}</b> of <b>{totalPages}</b>
-              </span>
-              <button
-                className="btn ghost"
-                disabled={currentPage >= totalPages - 1}
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              >
-                Next ›
-              </button>
-            </div>
+                <div className="pg">
+                  <button
+                    className="btn ghost"
+                    disabled={currentPage <= 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  >
+                    ‹ Prev
+                  </button>
+                  <span className="mu" style={{ fontSize: "13px" }}>
+                    Page <b>{currentPage + 1}</b> of <b>{totalPages}</b>
+                  </span>
+                  <button
+                    className="btn ghost"
+                    disabled={currentPage >= totalPages - 1}
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  >
+                    Next ›
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </section>
 
@@ -332,34 +581,49 @@ export function ProblemsView() {
           <div className="card">
             <h3>Recommended Next</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {recommendations.map((p) => (
-                <div
-                  key={p.id}
-                  style={{
-                    padding: "8px 10px",
-                    background: "var(--cf)",
-                    borderRadius: "8px",
-                    border: "1px solid var(--ln)",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <b style={{ fontSize: "13px" }}>{p.title}</b>
-                    <span className={`dc d${["E", "M", "H"][p.l]}`} style={{ fontSize: "10px", padding: "1px 6px" }}>
-                      {DIFFICULTY_LABELS[p.l]}
-                    </span>
-                  </div>
-                  <div className="mu" style={{ fontSize: "11px", margin: "4px 0 6px" }}>
-                    {p.t} • {p.pts} Pts
-                  </div>
-                  <button
-                    className="btn"
-                    style={{ fontSize: "11px", padding: "3px 10px", width: "100%" }}
-                    onClick={() => openProblemInSolver(p)}
+              {recommendations.length > 0 ? (
+                recommendations.map((p) => (
+                  <div
+                    key={p.slug || p.id}
+                    style={{
+                      padding: "8px 10px",
+                      background: "var(--cf)",
+                      borderRadius: "8px",
+                      border: "1px solid var(--ln)",
+                    }}
                   >
-                    Solve Now →
-                  </button>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <b style={{ fontSize: "13px" }}>{p.title}</b>
+                      <span
+                        className={`dc d${["E", "M", "H"][p.l]}`}
+                        style={{ fontSize: "10px", padding: "1px 6px" }}
+                      >
+                        {DIFFICULTY_LABELS[p.l]}
+                      </span>
+                    </div>
+                    <div className="mu" style={{ fontSize: "11px", margin: "4px 0 6px" }}>
+                      {p.t} • {p.pts} Pts
+                    </div>
+                    <button
+                      className="btn"
+                      style={{ fontSize: "11px", padding: "3px 10px", width: "100%" }}
+                      onClick={() => openProblemInSolver(p)}
+                    >
+                      Solve Now →
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="mu" style={{ fontSize: "12px" }}>
+                  No recommendations available
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -368,18 +632,25 @@ export function ProblemsView() {
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {[0, 1, 2].map((lvl) => {
                 const sCount = stats.solved[lvl];
-                const tCount = stats.total[lvl];
+                const tCount = Math.max(1, stats.total[lvl]);
                 const pct = Math.round((sCount / tCount) * 100);
                 const color = lvl === 0 ? "#2ED47A" : lvl === 1 ? "#E59A00" : "#FF5C7A";
 
                 return (
                   <div key={lvl}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "3px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "12px",
+                        marginBottom: "3px",
+                      }}
+                    >
                       <span style={{ color, fontWeight: 600 }}>
                         {DIFFICULTY_LABELS[lvl]}
                       </span>
                       <span className="mu">
-                        {sCount}/{tCount} ({pct}%)
+                        {sCount}/{stats.total[lvl]} ({pct}%)
                       </span>
                     </div>
                     <div className="bar">

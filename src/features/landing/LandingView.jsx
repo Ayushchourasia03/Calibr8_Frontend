@@ -2,7 +2,13 @@ import { useRef } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 
 export function LandingView() {
-  const { state, setView, setActiveModal, toggleThemeMode } = useCalibr8();
+  const {
+    state,
+    setView,
+    toggleThemeMode,
+    setAuthModalOpen,
+    setAuthMode,
+  } = useCalibr8();
   const heroRef = useRef(null);
 
   const handlePointerMove = (e) => {
@@ -16,8 +22,19 @@ export function LandingView() {
     if (state.started) {
       setView("home");
     } else {
-      setActiveModal("onboarding");
+      setAuthMode("register");
+      setAuthModalOpen(true);
     }
+  };
+
+  const handleOpenLogin = () => {
+    setAuthMode("login");
+    setAuthModalOpen(true);
+  };
+
+  const handleOpenRegister = () => {
+    setAuthMode("register");
+    setAuthModalOpen(true);
   };
 
   return (
@@ -42,6 +59,18 @@ export function LandingView() {
             </button>
             <button
               className="btn ghost"
+              onClick={handleOpenLogin}
+            >
+              Sign In
+            </button>
+            <button
+              className="btn"
+              onClick={handleOpenRegister}
+            >
+              Register
+            </button>
+            <button
+              className="btn ghost"
               onClick={() => setView("home")}
             >
               Explore a demo
@@ -58,9 +87,12 @@ export function LandingView() {
           One question a day, picked for your exact level. Small steps, steady compounding, real verified progress.
         </div>
 
-        <div className="pick">
+        <div className="pick" style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
           <button className="btn" onClick={handleStart}>
-            {state.started ? "Continue Practicing" : "Get Started"}
+            {state.started ? "Continue Practicing" : "Get Started (Register Free)"}
+          </button>
+          <button className="btn ghost" onClick={handleOpenLogin}>
+            Sign In
           </button>
         </div>
 

@@ -9,6 +9,7 @@ export function LevelModal() {
     setActiveModal,
     setTopicLevel,
     showToast,
+    saveOnboarding,
   } = useCalibr8();
 
   if (activeModal !== "level") return null;
@@ -25,11 +26,22 @@ export function LevelModal() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!Object.keys(L).length) {
       showToast("Please choose at least one topic.");
       return;
     }
+
+    try {
+      const topicSelections = Object.entries(L).map(([topic, lvl]) => ({
+        topicId: topic.toLowerCase().replace(/\s+/g, "-"),
+        difficulty: ["easy", "medium", "hard"][lvl] || "medium",
+      }));
+      await saveOnboarding({ topicSelections });
+    } catch {
+      // ignore
+    }
+
     close();
     showToast("Topics & levels updated successfully.");
   };

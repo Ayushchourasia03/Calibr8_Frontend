@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { SKINS } from "../../data/themesData";
+import { api, tokenStorage } from "../../services/api";
 
 export function StoreView() {
   const {
@@ -10,6 +12,29 @@ export function StoreView() {
     buyOrApplySkin,
     showToast,
   } = useCalibr8();
+
+  useEffect(() => {
+    let active = true;
+    async function loadThemes() {
+      if (!tokenStorage.get()) return;
+      try {
+        const res = await api.themes.getAll();
+        if (active && res?.themes && res.coins !== undefined) {
+          setState((s) => ({
+            ...s,
+            coins: res.coins,
+            ownedSkins: res.themes.filter((t) => t.owned).map((t) => t.slug),
+          }));
+        }
+      } catch {
+        // Use local skin state
+      }
+    }
+    loadThemes();
+    return () => {
+      active = false;
+    };
+  }, [setState]);
 
   const ownedSkins = state.ownedSkins || ["default"];
   const currentSkin = state.skin || "default";

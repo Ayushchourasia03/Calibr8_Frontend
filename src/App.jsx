@@ -9,6 +9,7 @@ import { TierInfoModal } from "./components/modals/TierInfoModal";
 import { StatInfoModal } from "./components/modals/StatInfoModal";
 import { TrackModal } from "./components/modals/TrackModal";
 import { VideoModal } from "./components/modals/VideoModal";
+import { AuthModal } from "./components/common/AuthModal";
 
 import { LandingView } from "./features/landing/LandingView";
 import { TodayView } from "./features/today/TodayView";
@@ -62,6 +63,7 @@ function MainContent() {
       <StatInfoModal />
       <TrackModal />
       <VideoModal />
+      <AuthModal />
 
       {/* Global Toast Notifications */}
       <Toast />
