@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../services/api";
+import { socialApi } from "./socialApi";
 import { useCalibr8 } from "../../context/Calibr8Context";
 
 const GithubIcon = () => (
@@ -117,8 +117,8 @@ export function ConnectedAccounts({ onRequireAuth }) {
     setStatus({ type: "", message: "" });
 
     try {
-      const { url } = await api.social.getLinkUrl(provider);
-      window.location.assign(url);
+      const { url } = await socialApi.getLinkUrl(provider);
+      if (url) window.location.assign(url);
     } catch (err) {
       setStatus({
         type: "error",
@@ -129,13 +129,11 @@ export function ConnectedAccounts({ onRequireAuth }) {
   };
 
   const handleDisconnect = async (provider) => {
-    if (!window.confirm(`Disconnect ${provider}?`)) return;
-
     setBusy(provider);
     setStatus({ type: "", message: "" });
 
     try {
-      await api.social.unlink(provider);
+      await socialApi.unlink(provider);
       await refreshUser?.();
       setStatus({ type: "success", message: `${provider} disconnected.` });
     } catch (err) {

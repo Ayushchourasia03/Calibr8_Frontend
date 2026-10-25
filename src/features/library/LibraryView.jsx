@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { CURRICULUM } from "../../data/curriculumData";
-import { api } from "../../services/api";
+import { studyApi } from "./studyApi";
 
 const DEFAULT_SUBJECTS = [
   { slug: "oops", name: "Object-Oriented Programming", icon: "🧩" },
@@ -33,7 +33,7 @@ export function LibraryView() {
     let active = true;
     async function loadSubjects() {
       try {
-        const res = await api.study.getSubjects();
+        const res = await studyApi.getSubjects();
         if (active && Array.isArray(res) && res.length > 0) {
           const mapped = res.map((s) => ({
             id: s.id,
@@ -77,7 +77,7 @@ export function LibraryView() {
       setLoadingSubject(true);
 
       try {
-        const res = await api.study.getSubject(activeSubjectSlug);
+        const res = await studyApi.getSubject(activeSubjectSlug);
         if (active && res) {
           setSubjectData(res);
 
@@ -88,7 +88,7 @@ export function LibraryView() {
           await Promise.all(
             chapters.map(async (chap) => {
               try {
-                const topics = await api.study.getChapterTopics(chap.id);
+                const topics = await studyApi.getChapterTopics(chap.id);
                 if (Array.isArray(topics)) {
                   topicMap[chap.id] = topics;
                 }
@@ -160,7 +160,7 @@ export function LibraryView() {
     setQuizResults(null);
 
     try {
-      const res = await api.study.getTopicDetail(topic.slug);
+      const res = await studyApi.getTopicDetail(topic.slug);
       if (res && (res.content || res.name)) {
         setLessonData(res);
       } else {
@@ -210,7 +210,7 @@ export function LibraryView() {
     setSubmittingQuiz(true);
 
     try {
-      const res = await api.study.submitQuiz(lessonData.slug, selectedAnswers);
+      const res = await studyApi.submitQuiz(lessonData.slug, selectedAnswers);
       if (res?.results) {
         setQuizResults(res);
         showToast(`Quiz completed! Score: ${res.score}/${res.totalQuestions} (${res.percentage}%)`);

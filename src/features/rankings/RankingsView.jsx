@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { RANKING_CATEGORIES } from "../../data/rankingsData";
 import { getTierForRating } from "../../utils/tierUtils";
-import { api } from "../../services/api";
+import { rankingsApi } from "./rankingsApi";
 
 export function RankingsView() {
   const { state } = useCalibr8();
@@ -38,7 +38,7 @@ export function RankingsView() {
           params.country = state.country;
         }
 
-        const res = await api.rankings.getRankings(params);
+        const res = await rankingsApi.getRankings(params);
 
         if (isMounted) {
           if (res?.data && Array.isArray(res.data)) {

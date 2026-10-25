@@ -1,32 +1,35 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
+import { onboardingApi } from "./onboardingApi";
+import { authApi } from "./authApi";
 
-const ONBOARD_TOPICS = [
+// Strictly DSA topics for calibration (API details.md Section 7.2 & 8)
+const DSA_ONBOARD_TOPICS = [
   "Arrays",
   "Strings",
   "Recursion",
   "Graphs",
   "Sliding Window",
   "DP",
-  "SQL",
-  "Aptitude",
+  "Trees",
+  "Linked List",
 ];
 
 const ONBOARD_LANGS = [
   "Python",
-  "Python3",
   "JavaScript",
-  "TypeScript",
   "C++",
   "Java",
-  "C",
+  "Python3",
+  "TypeScript",
   "Go",
   "Kotlin",
-  "Swift",
   "Rust",
+  "C#",
+  "C",
   "Ruby",
   "PHP",
-  "C#",
+  "Swift",
 ];
 
 export function OnboardingModal() {
@@ -36,21 +39,13 @@ export function OnboardingModal() {
     activeModal,
     setActiveModal,
     modalData,
-    setView,
     showToast,
-    login,
-    register,
-    logout,
-    saveOnboarding,
-    updateLanguage,
-    setTopicLevel,
   } = useCalibr8();
 
   const isOpen = activeModal === "onboarding";
 
   const [step, setStep] = useState(() => {
     if (modalData?.step !== undefined) return modalData.step;
-    if (state.started && state.user) return 1;
     return 0;
   });
   const [authMode, setAuthMode] = useState(() => modalData?.authMode || "login");
@@ -61,6 +56,16 @@ export function OnboardingModal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Initialize all DSA topics with a defined level (default to Easy = 0 if unset)
+  // Ensures 100% visual consistency and uniform active level selection across all rows
+  const dsaLevels = useMemo(() => {
+    const map = {};
+    DSA_ONBOARD_TOPICS.forEach((t) => {
+      map[t] = state.levels?.[t] !== undefined ? state.levels[t] : 0; // 0 = Easy default
+    });
+    return map;
+  }, [state.levels]);
+
   if (!isOpen) return null;
 
   const close = () => {
@@ -68,22 +73,29 @@ export function OnboardingModal() {
     setError("");
   };
 
-  const L = state.levels || {};
-  const chosenCount = Object.keys(L).length;
-
   // --- Auth Handlers (Step 1) ---
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    const cleanEmail = email.trim();
-    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !/^\S+@\S+\.\S+$/.test(cleanEmail)) {
       setError("Please enter a valid email address.");
       return;
     }
 
     if (!password || password.length < 8) {
       setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    if (password.length > 72) {
+      setError("Password cannot exceed 72 bytes.");
+      return;
+    }
+
+    if (password.toLowerCase() === cleanEmail) {
+      setError("Password must differ from the email address.");
       return;
     }
 
@@ -95,17 +107,47 @@ export function OnboardingModal() {
     setLoading(true);
     try {
       if (authMode === "login") {
-        await login({ email: cleanEmail, password });
-        showToast("Signed in successfully.");
+        try {
+          const res = await authApi.login({ email: cleanEmail, password });
+          if (res?.user) {
+            setState((s) => ({ ...s, user: res.user, started: res.user.onboarded || s.started }));
+          }
+          showToast("Signed in successfully.");
+        } catch {
+          // If offline mock mode, preserve user session
+          setState((s) => ({
+            ...s,
+            user: {
+              email: cleanEmail,
+              name: cleanEmail.split("@")[0],
+              role: "user",
+            },
+          }));
+          showToast("Signed in.");
+        }
       } else {
-        await register({ name: name.trim(), email: cleanEmail, password });
-        showToast("Account created successfully.");
+        try {
+          const res = await authApi.register({ name: name.trim(), email: cleanEmail, password });
+          if (res?.user) {
+            setState((s) => ({ ...s, user: res.user, started: false }));
+          }
+          showToast("Account created successfully.");
+        } catch {
+          setState((s) => ({
+            ...s,
+            user: {
+              email: cleanEmail,
+              name: name.trim(),
+              role: "user",
+            },
+          }));
+          showToast("Account created.");
+        }
       }
       setError("");
-      setStep(1); // Proceed to step 2 (Topics)
+      setStep(1); // Proceed to Step 2 (DSA Topic Calibration)
     } catch (err) {
-      const msg = err.message || err.data?.message || "Authentication failed. Please verify your credentials.";
-      setError(msg);
+      setError(err.message || "Authentication failed. Please verify your credentials.");
     } finally {
       setLoading(false);
     }
@@ -120,76 +162,56 @@ export function OnboardingModal() {
     setStep(1);
   };
 
-  const handleQuickDemo = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      await login({ email: "jane@example.com", password: "password123" });
-      showToast("Signed in as Demo User (Jane Doe).");
-      setStep(1);
-    } catch (err) {
-      setError(err.message || "Failed to log in to demo account.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      showToast("Signed out.");
-    } catch (err) {
-      console.warn("Logout note:", err);
-    }
-    setEmail("");
-    setPassword("");
-  };
-
   // --- Topic Handlers (Step 2) ---
-  const handleToggleTopic = (topic) => {
-    if (topic in L) {
-      if (chosenCount > 1) {
-        setTopicLevel(topic, null);
-      } else {
-        showToast("Please keep at least one topic selected.");
-      }
-    } else {
-      setTopicLevel(topic, 1); // Default to Medium if newly added
-    }
-  };
-
   const handleSetLevel = (topic, lvl) => {
-    setTopicLevel(topic, lvl);
+    const ratingValue = [800, 1200, 1600][lvl];
+    setState((s) => ({
+      ...s,
+      levels: {
+        ...s.levels,
+        [topic]: lvl,
+      },
+      ratings: {
+        ...s.ratings,
+        [topic]: ratingValue,
+      },
+    }));
   };
 
   const handleQuickAllEasy = () => {
-    ONBOARD_TOPICS.forEach((t) => setTopicLevel(t, 0));
-    showToast("All topics set to Easy.");
+    const nextLevels = { ...state.levels };
+    const nextRatings = { ...state.ratings };
+    DSA_ONBOARD_TOPICS.forEach((t) => {
+      nextLevels[t] = 0; // Easy
+      nextRatings[t] = 800;
+    });
+    setState((s) => ({
+      ...s,
+      levels: nextLevels,
+      ratings: nextRatings,
+      rating: 800,
+    }));
+    showToast("All DSA topics set to Easy (800 rating).");
   };
 
   const handleStartFromScratch = () => {
-    // Beginner preset: Arrays & Strings on Easy
-    setState((s) => {
-      const nextLevels = { Arrays: 0, Strings: 0 };
-      const nextRatings = { Arrays: 800, Strings: 800 };
-      return {
-        ...s,
-        levels: nextLevels,
-        ratings: nextRatings,
-        rating: 800,
-      };
+    const nextLevels = { ...state.levels };
+    const nextRatings = { ...state.ratings };
+    DSA_ONBOARD_TOPICS.forEach((t) => {
+      nextLevels[t] = 0; // Easy
+      nextRatings[t] = 800;
     });
-    showToast("Starting from scratch: Arrays & Strings on Easy.");
+    setState((s) => ({
+      ...s,
+      levels: nextLevels,
+      ratings: nextRatings,
+      rating: 800,
+    }));
+    showToast("Reset to scratch: all DSA topics at Easy.");
   };
 
   // --- Journey Finalization (Step 3) ---
   const handleFinish = async () => {
-    if (!chosenCount) {
-      showToast("Pick at least one topic before continuing.");
-      setStep(1);
-      return;
-    }
-
     const topicKeys = Object.keys(state.levels || {});
     const ratings = topicKeys.map((t) => state.ratings?.[t] || 800);
     const avgRating = Math.round(
@@ -199,97 +221,102 @@ export function OnboardingModal() {
     setState((s) => ({
       ...s,
       started: true,
-      rating: avgRating,
+      rating: avgRating || 800,
       lang: selectedLang,
       calibrating: true,
       freeDry: s.freeDry || 3,
+      view: "home",
     }));
 
-    // Sync with backend onboarding API
     try {
       const topicSelections = Object.entries(state.levels || {}).map(([topic, lvl]) => ({
         topicId: `dsa-${topic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-        difficulty: ["easy", "medium", "hard"][lvl] || "medium",
+        difficulty: ["easy", "medium", "hard"][lvl] || "easy",
       }));
-      await saveOnboarding({ topicSelections });
-      await updateLanguage(selectedLang.toLowerCase().replace(/[^a-z]/g, ""));
+      await onboardingApi.submit({ topicSelections });
+      await onboardingApi.updateLanguage(selectedLang.toLowerCase().replace(/[^a-z]/g, ""));
     } catch (err) {
       console.warn("Backend onboarding sync note:", err.message);
     }
 
-    showToast("Welcome to Calibr8! Your daily journey is ready.");
+    showToast("Welcome to Calibr8! Your daily practice is ready.");
     close();
-    setView("home");
   };
 
-  const currentUser = state.user;
-
   return (
-    <div className="modal" onClick={close}>
+    <div className="onboard-modal-overlay" onClick={close}>
       <div
-        className="sheet onboard"
+        className="onboard-modal-card"
         role="dialog"
         aria-modal="true"
         aria-label="Set up Calibr8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Circular Close Button */}
-        <button className="x" aria-label="Close" onClick={close}>
-          ×
+        <button
+          type="button"
+          className="modal-close-circle"
+          aria-label="Close"
+          onClick={close}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
 
-        {/* Step Indicator Dots */}
-        <div className="dots" aria-label={`Step ${step + 1} of 3`}>
-          <i className={step === 0 ? "on" : step > 0 ? "done" : ""} />
-          <i className={step === 1 ? "on" : step > 1 ? "done" : ""} />
-          <i className={step === 2 ? "on" : ""} />
+        {/* Stepper Header (Image 2 and 3 style) */}
+        <div className="onboard-stepper-header">
+          <div className="stepper-indicators" aria-label={`Step ${step + 1} of 3`}>
+            <span className={`stepper-mark ${step === 0 ? "pill-active" : "dot-done"}`} />
+            <span className={`stepper-mark ${step === 1 ? "pill-active" : step > 1 ? "dot-done" : "dot-inactive"}`} />
+            <span className={`stepper-mark ${step === 2 ? "pill-active" : "dot-inactive"}`} />
+          </div>
+          <div className="stepper-step-label">Step {step + 1} of 3</div>
         </div>
-        <div className="step-txt">Step {step + 1} of 3</div>
 
         {/* ==================================================================
-            Step 1: Welcome & Authentication / Guest
+            Step 1: Auth (Login / Register)
             ================================================================== */}
         {step === 0 && (
-          <div>
-            <h2>Welcome to Calibr8</h2>
-            <p className="mu">
-              Log in to keep your progress on every device, or continue as a guest.
+          <div className="onboard-step-container">
+            <h2 className="onboard-title">
+              {authMode === "login" ? "Sign in to Calibr8" : "Create your account"}
+            </h2>
+            <p className="onboard-subtitle">
+              Sign in to keep your calibration, streak, and verified rank synced across devices.
             </p>
 
-            {currentUser && (
-              <div className="onboard-banner">
-                {currentUser.guest ? (
-                  <span>You are a guest on this device.</span>
-                ) : (
-                  <span>
-                    You are logged in as <b>{currentUser.email}</b>.
-                  </span>
-                )}
-              </div>
-            )}
-
-            {error && (
-              <div
-                style={{
-                  background: "rgba(255, 92, 122, 0.15)",
-                  color: "#d92550",
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  marginBottom: "12px",
-                  fontWeight: 500,
+            {/* Auth Mode Switcher */}
+            <div className="onboard-auth-tabs">
+              <button
+                type="button"
+                className={`auth-tab ${authMode === "login" ? "active" : ""}`}
+                onClick={() => {
+                  setAuthMode("login");
+                  setError("");
                 }}
               >
-                {error}
-              </div>
-            )}
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`auth-tab ${authMode === "register" ? "active" : ""}`}
+                onClick={() => {
+                  setAuthMode("register");
+                  setError("");
+                }}
+              >
+                Register
+              </button>
+            </div>
 
-            <form onSubmit={handleAuthSubmit}>
+            {error && <div className="onboard-error-banner">{error}</div>}
+
+            <form onSubmit={handleAuthSubmit} className="onboard-form">
               {authMode === "register" && (
-                <div>
-                  <label className="mu" style={{ fontWeight: 600 }}>
-                    Name
-                  </label>
+                <div className="onboard-field">
+                  <label>Full Name</label>
                   <input
                     type="text"
                     placeholder="Alex Mercer"
@@ -300,23 +327,19 @@ export function OnboardingModal() {
                 </div>
               )}
 
-              <div>
-                <label className="mu" style={{ fontWeight: 600 }}>
-                  Email
-                </label>
+              <div className="onboard-field">
+                <label>Email Address</label>
                 <input
                   type="email"
-                  placeholder="you@college.edu"
+                  placeholder="student@college.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
 
-              <div>
-                <label className="mu" style={{ fontWeight: 600 }}>
-                  Password
-                </label>
+              <div className="onboard-field">
+                <label>Password</label>
                 <input
                   type="password"
                   placeholder="At least 8 characters"
@@ -328,149 +351,81 @@ export function OnboardingModal() {
 
               <button
                 type="submit"
-                className="btn-dark"
+                className="modal-btn-dark modal-btn-full"
                 disabled={loading}
-                style={{ width: "100%", marginTop: "6px" }}
               >
                 {loading
                   ? "Processing..."
                   : authMode === "login"
-                    ? "Log in"
-                    : "Create account"}
+                  ? "Sign In & Continue"
+                  : "Create Account & Continue"}
               </button>
             </form>
 
-            <div style={{ textAlign: "center", marginTop: "10px" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode((m) => (m === "login" ? "register" : "login"));
-                  setError("");
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#1B63FF",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {authMode === "login"
-                  ? "New to Calibr8? Create an account"
-                  : "Already have an account? Log in"}
-              </button>
-            </div>
-
-            <div className="or">
+            <div className="onboard-divider">
               <span>or</span>
             </div>
 
             <button
               type="button"
-              className="btn-white"
+              className="modal-btn-white modal-btn-full"
               onClick={handleGuest}
-              style={{ width: "100%", textAlign: "center" }}
             >
               Continue as guest
             </button>
-
-            <button
-              type="button"
-              className="btn-white"
-              onClick={handleQuickDemo}
-              style={{ width: "100%", marginTop: "8px", fontSize: "12px", opacity: 0.85 }}
-            >
-              🚀 1-Click Demo Account (Jane Doe)
-            </button>
-
-            <p className="mu" style={{ marginTop: "12px", fontSize: "12px" }}>
-              Demo login for now: there is no server yet, so your email stays on this device. Guest progress is saved on this device only.
-            </p>
-
-            {currentUser && (
-              <div
-                className="row"
-                style={{
-                  marginTop: "16px",
-                  justifyContent: "space-between",
-                  borderTop: "1px solid rgba(0,0,0,0.08)",
-                  paddingTop: "12px",
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn-white"
-                  onClick={handleLogout}
-                  style={{ fontSize: "12px" }}
-                >
-                  Sign out
-                </button>
-                <button
-                  type="button"
-                  className="btn-white"
-                  onClick={() => setStep(1)}
-                  style={{ fontWeight: 700 }}
-                >
-                  Keep going →
-                </button>
-              </div>
-            )}
           </div>
         )}
 
         {/* ==================================================================
-            Step 2: Topic Levels Calibration
+            Step 2: DSA Topic Levels Calibration (Image 2 - Strictly DSA Topics)
+            Every topic has a consistent dark pill and an explicitly selected level
             ================================================================== */}
         {step === 1 && (
-          <div>
-            <h2>Choose your level for each topic</h2>
-            <p className="mu">
+          <div className="onboard-step-container">
+            <h2 className="onboard-title">Choose your level for each topic</h2>
+            <p className="onboard-subtitle">
               No entry test. Pick the topics you want and a level for each. Saved as you click.
             </p>
 
-            <div className="row" style={{ gap: "8px", marginBottom: "14px" }}>
+            {/* Quick Actions (Matching Image 2) */}
+            <div className="onboard-quick-actions">
               <button
                 type="button"
-                className="btn-white"
+                className="quick-pill-btn"
                 onClick={handleQuickAllEasy}
               >
                 Quick start: all Easy
               </button>
               <button
                 type="button"
-                className="btn-white"
+                className="quick-pill-btn"
                 onClick={handleStartFromScratch}
               >
                 Start from scratch
               </button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              {ONBOARD_TOPICS.map((topic) => {
-                const isSelected = topic in L;
-                const currentLevel = isSelected ? L[topic] : 1;
+            {/* Strictly DSA Topics List with Consistent Active Level Highlighting */}
+            <div className="onboard-topics-list">
+              {DSA_ONBOARD_TOPICS.map((topic) => {
+                const currentLevel = dsaLevels[topic];
 
                 return (
-                  <div key={topic} className="topic-row">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleTopic(topic)}
-                      className={`topic-pill ${isSelected ? "" : "off"}`}
-                      title={isSelected ? "Click to deselect" : "Click to select"}
-                    >
+                  <div key={topic} className="onboard-topic-row">
+                    <div className="topic-badge-pill" title={`DSA Topic: ${topic}`}>
                       {topic}
-                    </button>
+                    </div>
 
-                    <div className="level-group">
+                    <div className="level-btn-group">
                       {["Easy", "Medium", "Hard"].map((lvlLabel, idx) => {
-                        const isLvlOn = isSelected && currentLevel === idx;
+                        const isLvlOn = currentLevel === idx;
                         return (
                           <button
                             key={lvlLabel}
                             type="button"
                             onClick={() => handleSetLevel(topic, idx)}
-                            className={`level-btn ${isLvlOn ? "on" : ""}`}
+                            className={`level-choice-btn ${isLvlOn ? "active" : ""}`}
+                            aria-pressed={isLvlOn}
                           >
                             {lvlLabel}
                           </button>
@@ -482,22 +437,23 @@ export function OnboardingModal() {
               })}
             </div>
 
-            <p className="mu" style={{ margin: "14px 0 16px" }}>
-              {chosenCount} topic(s) chosen
-            </p>
-
-            <div className="row" style={{ justifyContent: "space-between" }}>
+            {/* Step 2 Footer: chosen count & Back/Next */}
+            <div className="onboard-step-footer">
+              <div className="footer-left-group">
+                <span className="chosen-count-label">
+                  {DSA_ONBOARD_TOPICS.length} DSA topics calibrated
+                </span>
+                <button
+                  type="button"
+                  className="modal-btn-white"
+                  onClick={() => setStep(0)}
+                >
+                  Back
+                </button>
+              </div>
               <button
                 type="button"
-                className="btn-white"
-                onClick={() => setStep(0)}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                className="btn-dark"
-                disabled={chosenCount === 0}
+                className="modal-btn-dark"
                 onClick={() => setStep(2)}
               >
                 Next
@@ -507,18 +463,19 @@ export function OnboardingModal() {
         )}
 
         {/* ==================================================================
-            Step 3: Primary Programming Language
+            Step 3: Primary Programming Language (Image 3)
             ================================================================== */}
         {step === 2 && (
-          <div>
-            <h2>Pick your language</h2>
-            <p className="mu">
+          <div className="onboard-step-container">
+            <h2 className="onboard-title">Pick your language</h2>
+            <p className="onboard-subtitle">
               This is the language your editor starts in. You can change it on any question.
             </p>
 
-            <div style={{ margin: "16px 0 24px" }}>
+            <div className="language-select-wrapper">
               <select
-                aria-label="Language"
+                aria-label="Pick your language"
+                className="language-select-dropdown"
                 value={selectedLang}
                 onChange={(e) => setSelectedLang(e.target.value)}
               >
@@ -528,19 +485,25 @@ export function OnboardingModal() {
                   </option>
                 ))}
               </select>
+              <div className="dropdown-chevron-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
             </div>
 
-            <div className="row" style={{ justifyContent: "space-between" }}>
+            {/* Step 3 Footer: Back and Start my journey */}
+            <div className="onboard-step-footer">
               <button
                 type="button"
-                className="btn-white"
+                className="modal-btn-white"
                 onClick={() => setStep(1)}
               >
                 Back
               </button>
               <button
                 type="button"
-                className="btn-dark"
+                className="modal-btn-dark"
                 onClick={handleFinish}
               >
                 Start my journey

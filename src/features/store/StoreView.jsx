@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { SKINS } from "../../data/themesData";
-import { api, tokenStorage } from "../../services/api";
+import { themesApi } from "./themesApi";
+import { tokenStorage } from "../../services/apiClient";
 
 export function StoreView() {
   const {
@@ -18,7 +19,7 @@ export function StoreView() {
     async function loadThemes() {
       if (!tokenStorage.get()) return;
       try {
-        const res = await api.themes.getAll();
+        const res = await themesApi.getAll();
         if (active && res?.themes && res.coins !== undefined) {
           setState((s) => ({
             ...s,

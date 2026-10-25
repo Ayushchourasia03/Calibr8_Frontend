@@ -567,6 +567,46 @@ export function Calibr8Provider({ children }) {
     }
   };
 
+  const exploreDemo = useCallback(() => {
+    const dsaTopics = [
+      "Arrays",
+      "Strings",
+      "Recursion",
+      "Graphs",
+      "Sliding Window",
+      "DP",
+      "Trees",
+      "Linked List",
+    ];
+    const easyLevels = {};
+    const easyRatings = {};
+    dsaTopics.forEach((t) => {
+      easyLevels[t] = 0; // 0 = Easy
+      easyRatings[t] = 800; // 800 = Easy calibration rating
+    });
+
+    setState((s) => ({
+      ...s,
+      started: true,
+      calibrating: false,
+      rating: 800,
+      score: s.score || 800,
+      levels: easyLevels,
+      ratings: easyRatings,
+      lang: s.lang || "Python3",
+      user: s.user || {
+        guest: false,
+        name: "Demo Learner",
+        email: "demo@calibr8.local",
+        difficulty: "easy",
+        rating: 800,
+      },
+      view: "home",
+    }));
+
+    showToast("Demo started! All DSA topics set to Easy.");
+  }, [showToast]);
+
   // Run code against backend execution sandbox (/api/execution/runs)
   const runCode = async ({ slug, problemId, language, code }) => {
     return await api.execution.run({ slug, problemId, language, code });
@@ -627,6 +667,7 @@ export function Calibr8Provider({ children }) {
         updateAcademicProfile,
         updateLanguage,
         saveOnboarding,
+        exploreDemo,
         runCode,
         submitCode,
         // Auth modal controls

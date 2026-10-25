@@ -1,7 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { DIFFICULTY_LABELS } from "../../data/constants";
-import { api, tokenStorage } from "../../services/api";
+import { problemsApi } from "./problemsApi";
+import { topicsApi } from "../tracks/topicsApi";
+import { usersApi } from "../profile/usersApi";
+import { tokenStorage } from "../../services/apiClient";
 
 export function ProblemsView() {
   const { state, openProblemInSolver } = useCalibr8();
@@ -29,7 +32,7 @@ export function ProblemsView() {
 
     async function fetchMetadata() {
       try {
-        const catRes = await api.topics.getCategories();
+        const catRes = await topicsApi.getCategories();
         if (isMounted && Array.isArray(catRes)) {
           setCategories(catRes);
         }
@@ -40,7 +43,7 @@ export function ProblemsView() {
       if (!tokenStorage.get()) return;
 
       try {
-        const solvedRes = await api.users.getSolvedProblems();
+        const solvedRes = await usersApi.getSolvedProblems();
         if (isMounted && solvedRes?.data && Array.isArray(solvedRes.data)) {
           const sMap = {};
           solvedRes.data.forEach((p) => {
@@ -64,103 +67,6 @@ export function ProblemsView() {
     };
   }, []);
 
-  // 2. Fetch problems list from BE when search, difficulty, or category changes
-  // useEffect(() => {
-  //   let isMounted = true;
-
-  //   async function fetchProblems() {
-  //     setLoading(true);
-  //     setError(null);
-
-  //     const diffParam =
-  //       selectedDifficulty === 0
-  //         ? "Easy"
-  //         : selectedDifficulty === 1
-  //           ? "Medium"
-  //           : selectedDifficulty === 2
-  //             ? "Hard"
-  //             : undefined;
-
-  //     try {
-  //       let rawList = [];
-
-  //       // If a specific topic slug is selected, call dedicated topic problems API
-  //       if (selectedTopic) {
-  //         try {
-  //           const topicRes = await api.topics.getCategoryProblems(selectedTopic, {
-  //             difficulty: diffParam,
-  //             search: query || undefined,
-  //           });
-  //           rawList = topicRes?.problems || [];
-  //         } catch {
-  //           // fallback to general problems API
-  //           const res = await api.problems.getAll({
-  //             difficulty: diffParam,
-  //             search: query || undefined,
-  //           });
-  //           rawList = res?.data || [];
-  //         }
-  //       } else {
-  //         // General problem catalog dedicated API: GET /api/problems
-  //         const res = await api.problems.getAll({
-  //           difficulty: diffParam,
-  //           search: query || undefined,
-  //         });
-  //         rawList = res?.data || [];
-  //       }
-
-  //       if (isMounted) {
-  //         if (Array.isArray(rawList)) {
-  //           const mapped = rawList.map((p, idx) => {
-  //             const diffStr = (p.difficulty || "Easy").toLowerCase();
-  //             const l = diffStr === "hard" ? 2 : diffStr === "medium" ? 1 : 0;
-  //             const probNum = p.problemNumber || p.number || idx + 1;
-  //             const slug = p.slug || `prob-${probNum}`;
-  //             const topicName =
-  //               p.topic ||
-  //               (p.tags && p.tags[0]) ||
-  //               (categories.find((c) => c.slug === selectedTopic)?.name) ||
-  //               "DSA Fundamentals";
-
-  //             return {
-  //               id: probNum,
-  //               problemNumber: probNum,
-  //               slug,
-  //               title: p.title || p.name || `Problem #${probNum}`,
-  //               t: topicName,
-  //               l,
-  //               d: l === 0 ? 1100 : l === 1 ? 1350 : 1700,
-  //               ac: p.solvedPercentage || 68 + ((probNum * 7) % 25),
-  //               pts: [10, 25, 50][l],
-  //               timeLimit: p.timeLimit,
-  //               memoryLimit: p.memoryLimit,
-  //               raw: p,
-  //             };
-  //           });
-  //           setProblems(mapped);
-  //         } else {
-  //           setProblems([]);
-  //         }
-  //       }
-  //     } catch (err) {
-  //       if (isMounted) {
-  //         console.warn("Could not fetch problems from BE:", err.message);
-  //         setError("Failed to load problems from backend server.");
-  //         setProblems([]);
-  //       }
-  //     } finally {
-  //       if (isMounted) {
-  //         setLoading(false);
-  //       }
-  //     }
-  //   }
-
-  //   fetchProblems();
-
-  //   return () => {
-  //     isMounted = false;
-  //   };
-  // }, [selectedDifficulty, selectedTopic, query, categories]);
 
   useEffect(() => {
     let isMounted = true;
@@ -180,18 +86,18 @@ export function ProblemsView() {
         let res;
         if (selectedTopic) {
           try {
-            res = await api.topics.getCategoryProblems(selectedTopic, {
+            res = await topicsApi.getCategoryProblems(selectedTopic, {
               difficulty: diffParam,
               search: query || undefined,
             });
           } catch {
-            res = await api.problems.getAll({
+            res = await problemsApi.getAll({
               difficulty: diffParam,
               search: query || undefined,
             });
           }
         } else {
-          res = await api.problems.getAll({
+          res = await problemsApi.getAll({
             difficulty: diffParam,
             search: query || undefined,
           });
