@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { onboardingApi } from "./onboardingApi";
 import { authApi } from "./authApi";
@@ -33,14 +33,8 @@ const ONBOARD_LANGS = [
 ];
 
 export function OnboardingModal() {
-  const {
-    state,
-    setState,
-    activeModal,
-    setActiveModal,
-    modalData,
-    showToast,
-  } = useCalibr8();
+  const { state, setState, activeModal, setActiveModal, modalData, showToast } =
+    useCalibr8();
 
   const isOpen = activeModal === "onboarding";
 
@@ -48,27 +42,23 @@ export function OnboardingModal() {
     if (modalData?.step !== undefined) return modalData.step;
     return 0;
   });
-  const [authMode, setAuthMode] = useState(() => modalData?.authMode || "login");
+  const [authMode, setAuthMode] = useState(
+    () => modalData?.authMode || "login",
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedLang, setSelectedLang] = useState(() => state.lang || "Python");
+  const [selectedLang, setSelectedLang] = useState(
+    () => state.lang || "Python",
+  );
+  const [selectedTopics, setSelectedTopics] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Initialize all DSA topics with a defined level (default to Easy = 0 if unset)
-  // Ensures 100% visual consistency and uniform active level selection across all rows
-  const dsaLevels = useMemo(() => {
-    const map = {};
-    DSA_ONBOARD_TOPICS.forEach((t) => {
-      map[t] = state.levels?.[t] !== undefined ? state.levels[t] : 0; // 0 = Easy default
-    });
-    return map;
-  }, [state.levels]);
 
   if (!isOpen) return null;
 
   const close = () => {
+    setSelectedTopics(new Set());
     setActiveModal(null);
     setError("");
   };
@@ -110,7 +100,11 @@ export function OnboardingModal() {
         try {
           const res = await authApi.login({ email: cleanEmail, password });
           if (res?.user) {
-            setState((s) => ({ ...s, user: res.user, started: res.user.onboarded || s.started }));
+            setState((s) => ({
+              ...s,
+              user: res.user,
+              started: res.user.onboarded || s.started,
+            }));
           }
           showToast("Signed in successfully.");
         } catch {
@@ -127,7 +121,11 @@ export function OnboardingModal() {
         }
       } else {
         try {
-          const res = await authApi.register({ name: name.trim(), email: cleanEmail, password });
+          const res = await authApi.register({
+            name: name.trim(),
+            email: cleanEmail,
+            password,
+          });
           if (res?.user) {
             setState((s) => ({ ...s, user: res.user, started: false }));
           }
@@ -147,7 +145,9 @@ export function OnboardingModal() {
       setError("");
       setStep(1); // Proceed to Step 2 (DSA Topic Calibration)
     } catch (err) {
-      setError(err.message || "Authentication failed. Please verify your credentials.");
+      setError(
+        err.message || "Authentication failed. Please verify your credentials.",
+      );
     } finally {
       setLoading(false);
     }
@@ -156,7 +156,11 @@ export function OnboardingModal() {
   const handleGuest = () => {
     setState((s) => ({
       ...s,
-      user: { guest: true, email: "guest@calibr8.local", name: "Guest Learner" },
+      user: {
+        guest: true,
+        email: "guest@calibr8.local",
+        name: "Guest Learner",
+      },
     }));
     setError("");
     setStep(1);
@@ -165,6 +169,7 @@ export function OnboardingModal() {
   // --- Topic Handlers (Step 2) ---
   const handleSetLevel = (topic, lvl) => {
     const ratingValue = [800, 1200, 1600][lvl];
+    setSelectedTopics((topics) => new Set(topics).add(topic));
     setState((s) => ({
       ...s,
       levels: {
@@ -179,6 +184,7 @@ export function OnboardingModal() {
   };
 
   const handleQuickAllEasy = () => {
+    setSelectedTopics(new Set(DSA_ONBOARD_TOPICS));
     const nextLevels = { ...state.levels };
     const nextRatings = { ...state.ratings };
     DSA_ONBOARD_TOPICS.forEach((t) => {
@@ -195,6 +201,7 @@ export function OnboardingModal() {
   };
 
   const handleStartFromScratch = () => {
+    setSelectedTopics(new Set(DSA_ONBOARD_TOPICS));
     const nextLevels = { ...state.levels };
     const nextRatings = { ...state.ratings };
     DSA_ONBOARD_TOPICS.forEach((t) => {
@@ -215,7 +222,7 @@ export function OnboardingModal() {
     const topicKeys = Object.keys(state.levels || {});
     const ratings = topicKeys.map((t) => state.ratings?.[t] || 800);
     const avgRating = Math.round(
-      ratings.reduce((a, b) => a + b, 0) / (ratings.length || 1)
+      ratings.reduce((a, b) => a + b, 0) / (ratings.length || 1),
     );
 
     setState((s) => ({
@@ -229,12 +236,16 @@ export function OnboardingModal() {
     }));
 
     try {
-      const topicSelections = Object.entries(state.levels || {}).map(([topic, lvl]) => ({
-        topicId: `dsa-${topic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-        difficulty: ["easy", "medium", "hard"][lvl] || "easy",
-      }));
+      const topicSelections = Object.entries(state.levels || {}).map(
+        ([topic, lvl]) => ({
+          topicId: `dsa-${topic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+          difficulty: ["easy", "medium", "hard"][lvl] || "easy",
+        }),
+      );
       await onboardingApi.submit({ topicSelections });
-      await onboardingApi.updateLanguage(selectedLang.toLowerCase().replace(/[^a-z]/g, ""));
+      await onboardingApi.updateLanguage(
+        selectedLang.toLowerCase().replace(/[^a-z]/g, ""),
+      );
     } catch (err) {
       console.warn("Backend onboarding sync note:", err.message);
     }
@@ -259,7 +270,16 @@ export function OnboardingModal() {
           aria-label="Close"
           onClick={close}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -267,10 +287,19 @@ export function OnboardingModal() {
 
         {/* Stepper Header (Image 2 and 3 style) */}
         <div className="onboard-stepper-header">
-          <div className="stepper-indicators" aria-label={`Step ${step + 1} of 3`}>
-            <span className={`stepper-mark ${step === 0 ? "pill-active" : "dot-done"}`} />
-            <span className={`stepper-mark ${step === 1 ? "pill-active" : step > 1 ? "dot-done" : "dot-inactive"}`} />
-            <span className={`stepper-mark ${step === 2 ? "pill-active" : "dot-inactive"}`} />
+          <div
+            className="stepper-indicators"
+            aria-label={`Step ${step + 1} of 3`}
+          >
+            <span
+              className={`stepper-mark ${step === 0 ? "pill-active" : "dot-done"}`}
+            />
+            <span
+              className={`stepper-mark ${step === 1 ? "pill-active" : step > 1 ? "dot-done" : "dot-inactive"}`}
+            />
+            <span
+              className={`stepper-mark ${step === 2 ? "pill-active" : "dot-inactive"}`}
+            />
           </div>
           <div className="stepper-step-label">Step {step + 1} of 3</div>
         </div>
@@ -281,10 +310,13 @@ export function OnboardingModal() {
         {step === 0 && (
           <div className="onboard-step-container">
             <h2 className="onboard-title">
-              {authMode === "login" ? "Sign in to Calibr8" : "Create your account"}
+              {authMode === "login"
+                ? "Sign in to Calibr8"
+                : "Create your account"}
             </h2>
             <p className="onboard-subtitle">
-              Sign in to keep your calibration, streak, and verified rank synced across devices.
+              Sign in to keep your calibration, streak, and verified rank synced
+              across devices.
             </p>
 
             {/* Auth Mode Switcher */}
@@ -357,8 +389,8 @@ export function OnboardingModal() {
                 {loading
                   ? "Processing..."
                   : authMode === "login"
-                  ? "Sign In & Continue"
-                  : "Create Account & Continue"}
+                    ? "Sign In & Continue"
+                    : "Create Account & Continue"}
               </button>
             </form>
 
@@ -384,7 +416,8 @@ export function OnboardingModal() {
           <div className="onboard-step-container">
             <h2 className="onboard-title">Choose your level for each topic</h2>
             <p className="onboard-subtitle">
-              No entry test. Pick the topics you want and a level for each. Saved as you click.
+              No entry test. Pick the topics you want and a level for each.
+              Saved as you click.
             </p>
 
             {/* Quick Actions (Matching Image 2) */}
@@ -408,17 +441,21 @@ export function OnboardingModal() {
             {/* Strictly DSA Topics List with Consistent Active Level Highlighting */}
             <div className="onboard-topics-list">
               {DSA_ONBOARD_TOPICS.map((topic) => {
-                const currentLevel = dsaLevels[topic];
+                const currentLevel = state.levels?.[topic];
 
                 return (
                   <div key={topic} className="onboard-topic-row">
-                    <div className="topic-badge-pill" title={`DSA Topic: ${topic}`}>
+                    <div
+                      className="topic-badge-pill"
+                      title={`DSA Topic: ${topic}`}
+                    >
                       {topic}
                     </div>
 
                     <div className="level-btn-group">
                       {["Easy", "Medium", "Hard"].map((lvlLabel, idx) => {
-                        const isLvlOn = currentLevel === idx;
+                        const isLvlOn =
+                          selectedTopics.has(topic) && currentLevel === idx;
                         return (
                           <button
                             key={lvlLabel}
@@ -469,7 +506,8 @@ export function OnboardingModal() {
           <div className="onboard-step-container">
             <h2 className="onboard-title">Pick your language</h2>
             <p className="onboard-subtitle">
-              This is the language your editor starts in. You can change it on any question.
+              This is the language your editor starts in. You can change it on
+              any question.
             </p>
 
             <div className="language-select-wrapper">
@@ -486,7 +524,16 @@ export function OnboardingModal() {
                 ))}
               </select>
               <div className="dropdown-chevron-icon" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </div>
