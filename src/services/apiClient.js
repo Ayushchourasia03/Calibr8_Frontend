@@ -385,11 +385,28 @@ function handleMockFallback(endpoint, options = {}) {
         category: "DSA",
       },
       { id: "t-6", slug: "dsa-dp", name: "DP", category: "DSA" },
-      { id: "t-7", slug: "dsa-trees", name: "Trees", category: "DSA" },
+      {
+        id: "t-7",
+        slug: "dsa-graphs-dp",
+        name: "DSA - Graphs & DP",
+        category: "DSA",
+      },
       {
         id: "t-8",
         slug: "dsa-linked-list",
-        name: "Linked List",
+        name: "DSA - Linked List",
+        category: "DSA",
+      },
+      {
+        id: "t-9",
+        slug: "dsa-stack-queue",
+        name: "DSA - Stack & Queue",
+        category: "DSA",
+      },
+      {
+        id: "t-10",
+        slug: "dsa-trees",
+        name: "DSA - Trees",
         category: "DSA",
       },
     ];

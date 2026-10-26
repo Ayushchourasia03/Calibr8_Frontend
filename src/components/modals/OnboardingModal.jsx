@@ -1,19 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { onboardingApi } from "./onboardingApi";
 import { authApi } from "./authApi";
-
-// Strictly DSA topics for calibration (API details.md Section 7.2 & 8)
-const DSA_ONBOARD_TOPICS = [
-  "Arrays",
-  "Strings",
-  "Recursion",
-  "Graphs",
-  "Sliding Window",
-  "DP",
-  "Trees",
-  "Linked List",
-];
+import { topicsApi } from "../../features/tracks/topicsApi";
 
 const ONBOARD_LANGS = [
   "Python",
@@ -52,9 +41,45 @@ export function OnboardingModal() {
     () => state.lang || "Python",
   );
   const [selectedTopics, setSelectedTopics] = useState(() => new Set());
+  const [dsaTopics, setDsaTopics] = useState([]);
+  const [topicsLoading, setTopicsLoading] = useState(
+    () => modalData?.step === 1,
+  );
   const [loading, setLoading] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!isOpen || step !== 1) return undefined;
+
+    let cancelled = false;
+    topicsApi
+      .getDsa()
+      .then((result) => {
+        if (!cancelled) {
+          setDsaTopics(
+            (result?.topics || []).map((topic) => ({
+              ...topic,
+              displayName: topic.name.replace(/^DSA\s*[-:]\s*/i, ""),
+            })),
+          );
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(
+            err.message || "Could not load DSA topics. Please try again.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTopicsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, step]);
 
   if (!isOpen) return null;
 
@@ -123,6 +148,7 @@ export function OnboardingModal() {
         showToast("Account created successfully.");
       }
       setError("");
+      setTopicsLoading(true);
       setStep(1); // Proceed to Step 2 (DSA Topic Calibration)
     } catch (err) {
       setError(
@@ -143,6 +169,7 @@ export function OnboardingModal() {
       },
     }));
     setError("");
+    setTopicsLoading(true);
     setStep(1);
   };
 
@@ -164,10 +191,11 @@ export function OnboardingModal() {
   };
 
   const handleQuickAllEasy = () => {
-    setSelectedTopics(new Set(DSA_ONBOARD_TOPICS));
+    setSelectedTopics(new Set(dsaTopics.map((topic) => topic.name)));
     const nextLevels = { ...state.levels };
     const nextRatings = { ...state.ratings };
-    DSA_ONBOARD_TOPICS.forEach((t) => {
+    dsaTopics.forEach(({ name }) => {
+      const t = name;
       nextLevels[t] = 0; // Easy
       nextRatings[t] = 800;
     });
@@ -181,10 +209,11 @@ export function OnboardingModal() {
   };
 
   const handleStartFromScratch = () => {
-    setSelectedTopics(new Set(DSA_ONBOARD_TOPICS));
+    setSelectedTopics(new Set(dsaTopics.map((topic) => topic.name)));
     const nextLevels = { ...state.levels };
     const nextRatings = { ...state.ratings };
-    DSA_ONBOARD_TOPICS.forEach((t) => {
+    dsaTopics.forEach(({ name }) => {
+      const t = name;
       nextLevels[t] = 0; // Easy
       nextRatings[t] = 800;
     });
@@ -218,10 +247,12 @@ export function OnboardingModal() {
     );
 
     try {
-      const topicSelections = selectedTopicLevels.map(([topic, lvl]) => ({
-        topicId: `dsa-${topic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-        difficulty: ["easy", "medium", "hard"][lvl] || "easy",
-      }));
+      const topicSelections = selectedTopicLevels
+        .map(([topic, lvl]) => ({
+          topicId: dsaTopics.find((item) => item.name === topic)?.slug,
+          difficulty: ["easy", "medium", "hard"][lvl] || "easy",
+        }))
+        .filter((selection) => selection.topicId);
       const result = state.user?.guest
         ? { success: true }
         : await onboardingApi.submit({ topicSelections });
@@ -390,6 +421,9 @@ export function OnboardingModal() {
                 <label>Password</label>
                 <input
                   type="password"
+                  autoComplete={
+                    authMode === "login" ? "current-password" : "new-password"
+                  }
                   placeholder="At least 8 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -456,45 +490,49 @@ export function OnboardingModal() {
 
             {/* Strictly DSA Topics List with Consistent Active Level Highlighting */}
             <div className="onboard-topics-list">
-              {DSA_ONBOARD_TOPICS.map((topic) => {
-                const currentLevel = state.levels?.[topic];
+              {topicsLoading ? (
+                <p role="status">Loading DSA topics...</p>
+              ) : (
+                dsaTopics.map(({ name, displayName, slug }) => {
+                  const currentLevel = state.levels?.[name];
 
-                return (
-                  <div key={topic} className="onboard-topic-row">
-                    <div
-                      className="topic-badge-pill"
-                      title={`DSA Topic: ${topic}`}
-                    >
-                      {topic}
-                    </div>
+                  return (
+                    <div key={slug} className="onboard-topic-row">
+                      <div
+                        className="topic-badge-pill"
+                        title={`DSA Topic: ${displayName}`}
+                      >
+                        {displayName}
+                      </div>
 
-                    <div className="level-btn-group">
-                      {["Easy", "Medium", "Hard"].map((lvlLabel, idx) => {
-                        const isLvlOn =
-                          selectedTopics.has(topic) && currentLevel === idx;
-                        return (
-                          <button
-                            key={lvlLabel}
-                            type="button"
-                            onClick={() => handleSetLevel(topic, idx)}
-                            className={`level-choice-btn ${isLvlOn ? "active" : ""}`}
-                            aria-pressed={isLvlOn}
-                          >
-                            {lvlLabel}
-                          </button>
-                        );
-                      })}
+                      <div className="level-btn-group">
+                        {["Easy", "Medium", "Hard"].map((lvlLabel, idx) => {
+                          const isLvlOn =
+                            selectedTopics.has(name) && currentLevel === idx;
+                          return (
+                            <button
+                              key={lvlLabel}
+                              type="button"
+                              onClick={() => handleSetLevel(name, idx)}
+                              className={`level-choice-btn ${isLvlOn ? "active" : ""}`}
+                              aria-pressed={isLvlOn}
+                            >
+                              {lvlLabel}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             {/* Step 2 Footer: chosen count & Back/Next */}
             <div className="onboard-step-footer">
               <div className="footer-left-group">
                 <span className="chosen-count-label">
-                  {DSA_ONBOARD_TOPICS.length} DSA topics calibrated
+                  {dsaTopics.length} DSA topics calibrated
                 </span>
                 <button
                   type="button"

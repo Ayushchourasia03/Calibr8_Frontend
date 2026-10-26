@@ -1,8 +1,8 @@
 import { useCalibr8 } from "../../context/Calibr8Context";
 
 const DOCK_ITEMS = [
-  { id: "home", label: "Today", icon: "📅" },
-  { id: "solve", label: "Solve", icon: "💻" },
+  // { id: "home", label: "Today", icon: "📅" },
+  // { id: "solve", label: "Solve", icon: "💻" },
   { id: "problems", label: "Problems", icon: "📋" },
   { id: "library", label: "Library", icon: "📚" },
   { id: "tracks", label: "Tracks", icon: "🏢" },
