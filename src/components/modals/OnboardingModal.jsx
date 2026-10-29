@@ -249,7 +249,10 @@ export function OnboardingModal() {
     try {
       const topicSelections = selectedTopicLevels
         .map(([topic, lvl]) => ({
-          topicId: dsaTopics.find((item) => item.name === topic)?.slug,
+          topicId:
+            dsaTopics.find((item) => item.name === topic)?.slug ||
+            dsaTopics.find((item) => item.displayName === topic)?.slug ||
+            topic.toLowerCase().replace(/\s+/g, "-"),
           difficulty: ["easy", "medium", "hard"][lvl] || "easy",
         }))
         .filter((selection) => selection.topicId);
@@ -451,6 +454,20 @@ export function OnboardingModal() {
             <button
               type="button"
               className="modal-btn-white modal-btn-full"
+              style={{ marginTop: "8px", borderColor: "rgba(94, 160, 255, 0.4)", color: "#7cc0ff" }}
+              onClick={() => {
+                setAuthMode("login");
+                setEmail("student@example.com");
+                setPassword("StrongPassword123");
+              }}
+            >
+              ⚡ Fill Pre-Seeded Demo (student@example.com)
+            </button>
+
+            <button
+              type="button"
+              className="modal-btn-white modal-btn-full"
+              style={{ marginTop: "8px" }}
               onClick={handleGuest}
             >
               Continue as guest

@@ -1,7 +1,7 @@
 # Calibr8 — Complete Frontend Developer & AI Agent API Documentation
 
 > **Target Audience**: Frontend Engineers & AI Coding Agents building web/mobile clients (React, Next.js, Vue, React Native, Flutter, Swift, Kotlin).  
-> **Backend Base URL**: `http://localhost:3000` (Dev server binds to `0.0.0.0:3000`).  
+> **Backend Base URL**: `http://localhost:3000`. During local frontend development, API requests use Vite's same-origin proxy to this backend, avoiding browser CORS preflights. Set `VITE_API_URL` to use a different backend directly.  
 > **Global API Prefix**: `/api`  
 > **Default Content-Type**: `application/json`  
 > **Default Auth Scheme**: `Authorization: Bearer <jwt-token>`  
@@ -2022,4 +2022,3 @@ For immediate exploration and manual endpoint testing, the backend is pre-seeded
   - Role: `user`
   - Active Theme: `default` (Calibr8 Dark)
 - **1-Click Authentication**: Available directly on the Interactive Dashboard (`/`) via the `⚡ 1-Click Demo Login` button.
-

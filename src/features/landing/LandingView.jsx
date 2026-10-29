@@ -7,6 +7,8 @@ export function LandingView() {
     setActiveModal,
     setModalData,
     exploreDemo,
+    login,
+    showToast,
   } = useCalibr8();
   const heroRef = useRef(null);
 
@@ -26,6 +28,16 @@ export function LandingView() {
     exploreDemo();
   };
 
+  const handleDemoStudentLogin = async () => {
+    try {
+      await login({ email: "student@example.com", password: "StrongPassword123" });
+      showToast("Logged in as Demo Student (student@example.com)!");
+      setView("home");
+    } catch {
+      exploreDemo();
+    }
+  };
+
   return (
     <div className="landing-wrapper">
       {/* Hero Section */}
@@ -37,18 +49,28 @@ export function LandingView() {
         {/* Cursor-following atmospheric purple orb */}
         <div className="landing-orb" />
 
-        {/* Top Header - ONLY Calibr8 logo and Explore a demo button */}
+        {/* Top Header - Calibr8 logo and Demo buttons */}
         <header className="landing-top-nav">
           <div className="landing-logo" onClick={() => setView("landing")}>
             Calibr8
           </div>
-          <button
-            type="button"
-            className="landing-demo-btn"
-            onClick={handleExploreDemo}
-          >
-            Explore a demo
-          </button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              type="button"
+              className="landing-demo-btn"
+              style={{ background: "rgba(47, 139, 255, 0.18)", borderColor: "var(--ac)", color: "#7cc0ff" }}
+              onClick={handleDemoStudentLogin}
+            >
+              ⚡ 1-Click Demo Login
+            </button>
+            <button
+              type="button"
+              className="landing-demo-btn"
+              onClick={handleExploreDemo}
+            >
+              Explore a demo
+            </button>
+          </div>
         </header>
 
         {/* Floating stat top-right: 19 languages */}

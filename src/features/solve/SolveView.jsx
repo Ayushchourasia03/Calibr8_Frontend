@@ -28,16 +28,41 @@ export function SolveView() {
   const [quizResult, setQuizResult] = useState(null);
   const [resultData, setResultData] = useState(null);
 
+function getStarterTemplate(q, lang) {
+  const norm = (lang || "python").toLowerCase();
+  if (q?.templates) {
+    if (norm.includes("py") && q.templates.python) return q.templates.python;
+    if ((norm.includes("js") || norm.includes("javascript")) && q.templates.javascript) return q.templates.javascript;
+    if ((norm.includes("c++") || norm.includes("cpp")) && q.templates.cpp) return q.templates.cpp;
+    if (norm.includes("java") && q.templates.java) return q.templates.java;
+    if (norm === "c" && q.templates.c) return q.templates.c;
+  }
+  if (norm.includes("py")) {
+    return "class Solution:\n    def solve(self):\n        # Write your code here\n        pass\n";
+  }
+  if (norm.includes("js") || norm.includes("ts")) {
+    return "class Solution {\n    solve() {\n        // Write your code here\n    }\n}\n";
+  }
+  if (norm.includes("c++") || norm.includes("cpp")) {
+    return "#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    void solve() {\n        // Write your code here\n    }\n};\n";
+  }
+  if (norm.includes("java")) {
+    return "class Solution {\n    public void solve() {\n        // Write your code here\n    }\n}\n";
+  }
+  return "// Write your solution here\n";
+}
+
   const attempt = state.att;
   const isStrict = attempt?.mode === "strict";
   const isLocked = attempt?.locked;
 
   const startMode = (mode) => {
+    const starter = getStarterTemplate(currentQ, selectedLang);
     setState((s) => ({
       ...s,
       att: {
         mode,
-        code: "",
+        code: starter,
         hints: 0,
         locked: false,
         away: 0,
@@ -48,6 +73,22 @@ export function SolveView() {
     if (mode === "strict") {
       document.documentElement.requestFullscreen?.().catch(() => {});
     }
+  };
+
+  const handleLanguageChange = (newLang) => {
+    const prevStarter = getStarterTemplate(currentQ, selectedLang);
+    setSelectedLang(newLang);
+    setState((s) => {
+      let nextCode = s.att?.code;
+      if (!nextCode || nextCode.trim() === prevStarter.trim() || nextCode.trim() === "") {
+        nextCode = getStarterTemplate(currentQ, newLang);
+      }
+      return {
+        ...s,
+        lang: newLang,
+        att: s.att ? { ...s.att, code: nextCode } : null,
+      };
+    });
   };
 
   const handleAbandon = () => {
@@ -415,10 +456,7 @@ export function SolveView() {
               <div className="row" style={{ justifyContent: "space-between", marginBottom: "8px" }}>
                 <select
                   value={selectedLang}
-                  onChange={(e) => {
-                    setSelectedLang(e.target.value);
-                    setState((s) => ({ ...s, lang: e.target.value }));
-                  }}
+                  onChange={(e) => handleLanguageChange(e.target.value)}
                   disabled={!attempt}
                 >
                   {LANGS.map((lang) => (
@@ -451,7 +489,7 @@ export function SolveView() {
               {/* Monaco Editor Mount */}
               <MonacoEditor
                 language={selectedLang}
-                value={attempt ? attempt.code : "# Click 'Start Practice' to begin coding\n"}
+                value={attempt ? attempt.code : getStarterTemplate(currentQ, selectedLang)}
                 onChange={(val) => {
                   if (attempt) {
                     setState((s) => ({
@@ -465,6 +503,8 @@ export function SolveView() {
                 onPasteBlocked={() => {
                   showToast("Pasting is disabled in Strict Mode!");
                 }}
+                onRun={handleDryRun}
+                onSubmit={handleSubmit}
               />
 
               {/* Dry Run Test Case Output */}
