@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useEffect, useCallback } from "react";
 import {
   DEFAULT_QUESTION,
@@ -122,7 +123,12 @@ export function Calibr8Provider({ children }) {
   useEffect(() => {
     const currentSkin = previewSkinId || state.skin || "default";
     document.documentElement.dataset.skin = currentSkin;
-    document.documentElement.dataset.theme = state.mode || "dark";
+    const skinDef = SKINS[currentSkin];
+    if (skinDef?.themeMode) {
+      document.documentElement.dataset.theme = skinDef.themeMode;
+    } else {
+      document.documentElement.dataset.theme = state.mode || "dark";
+    }
   }, [state.skin, state.mode, previewSkinId]);
 
   // Save state to localStorage

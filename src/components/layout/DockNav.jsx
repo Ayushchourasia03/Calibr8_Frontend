@@ -1,8 +1,7 @@
 import { useCalibr8 } from "../../context/Calibr8Context";
 
-const DOCK_ITEMS = [
-  // { id: "home", label: "Today", icon: "📅" },
-  // { id: "solve", label: "Solve", icon: "💻" },
+const NAV_ITEMS = [
+  { id: "home", label: "Today", icon: "📅" },
   { id: "problems", label: "Problems", icon: "📋" },
   { id: "library", label: "Library", icon: "📚" },
   { id: "tracks", label: "Tracks", icon: "🏢" },
@@ -25,18 +24,24 @@ export function DockNav() {
   };
 
   return (
-    <aside id="dock">
-      {DOCK_ITEMS.map((item) => {
-        const isActive = state.view === item.id;
+    <aside id="dock" aria-label="Navigation sidebar">
+      {NAV_ITEMS.map((item) => {
+        const isActive =
+          state.view === item.id ||
+          (item.id === "problems" && state.view === "solve");
+
         return (
           <button
             key={item.id}
-            data-v={item.id}
+            data-k={item.id}
             onClick={() => handleClick(item.id)}
             className={isActive ? "on" : ""}
+            aria-label={item.label}
             title={item.label}
           >
-            <span>{item.icon}</span>
+            <span role="img" aria-hidden="true">
+              {item.icon}
+            </span>
             <em>{item.label}</em>
           </button>
         );

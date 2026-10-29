@@ -91,7 +91,7 @@ export const PROBLEMS_CATALOG = Array.from({ length: 5000 }, (_, i) => {
     l,
     t: TOPS[Math.floor(hs(id + 9e3) * TOPS.length)],
     ac: Math.round((a[0] + hs(id + 2e4) * (a[1] - a[0])) * 10) / 10,
-    title: `${AD[id % 30]} ${NO[Math.floor(id / 30) % 30]}`,
+    title: `${AD[id % 30]} ${NO[(id * 7 + Math.floor(id / 30)) % 30]}`,
     d: Math.round([600, 1000, 1500][l] + hs(id + 3e4) * [400, 500, 600][l]),
     pts: [10, 25, 50][l],
   };

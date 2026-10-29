@@ -50,6 +50,13 @@ export const TOPS = [
   "OOPs",
   "Networks",
   "Verbal",
+  "Beginner",
+  "Patterns",
+  "Basic Math",
+  "Hashing",
+  "Two Pointers",
+  "Linked List",
+  "Stack and Queue",
 ];
 
 export const DIFFICULTY_LABELS = ["Easy", "Medium", "Hard"];

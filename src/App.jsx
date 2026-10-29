@@ -1,6 +1,7 @@
 import { Calibr8Provider, useCalibr8 } from "./context/Calibr8Context";
 import { Header } from "./components/layout/Header";
 import { DockNav } from "./components/layout/DockNav";
+import { ThemeOverlay } from "./components/layout/ThemeOverlay";
 import { Toast } from "./components/common/Toast";
 
 import { OnboardingModal } from "./components/modals/OnboardingModal";
@@ -53,6 +54,7 @@ function MainContent() {
     <div className={state.view === "landing" ? "land" : ""}>
       <Header />
       <DockNav />
+      <ThemeOverlay />
 
       <main>{renderView()}</main>
 

@@ -110,3 +110,355 @@ export const HIRING_TRACKS = [
     outcome: "Interview-ready at the top end",
   },
 ];
+
+export const BANDS = [
+  [
+    "Service companies",
+    "Entry-level drives. Mostly aptitude, English and basic coding.",
+  ],
+  ["Product, mid-size", "Coding rounds plus CS fundamentals."],
+  ["Big tech", "Hard problems, follow-ups and strong communication."],
+  ["Top tier", "The highest bar: deep follow-ups, design and culture."],
+];
+
+export const COMPANIES = [
+  [
+    "Capgemini",
+    0,
+    0.82,
+    "Entry-level IT services drive.",
+    [
+      [
+        "Application and resume screening",
+        "Register through the campus portal or careers page. Your resume is checked for eligibility such as CGPA, backlogs and branch.",
+        "resume",
+      ],
+      [
+        "Online assessment",
+        "A timed test with aptitude, reasoning, English and pseudo-code, often with a coding section.",
+        "aptitude",
+      ],
+      [
+        "Technical interview",
+        "Programming basics, DBMS, OOPs, a walk through your project, sometimes a simple coding question.",
+        "tech",
+      ],
+      [
+        "HR interview",
+        "Communication, strengths and weaknesses, relocation and why this company.",
+        "hr",
+      ],
+      [
+        "Offer and onboarding",
+        "Offer letter, document verification and joining date.",
+        "offer",
+      ],
+    ],
+  ],
+  [
+    "TCS",
+    0,
+    0.74,
+    "Large national hiring test with several categories of roles.",
+    [
+      [
+        "Registration and resume",
+        "Register on the official portal and keep your resume and academic details ready.",
+        "resume",
+      ],
+      [
+        "National qualifier test",
+        "Sections on numerical, verbal and reasoning ability plus programming. Check the official site for the current format.",
+        "aptitude",
+      ],
+      [
+        "Technical interview",
+        "Programming, DBMS, OOPs, projects and basic problem solving.",
+        "tech",
+      ],
+      [
+        "Managerial round",
+        "Situation questions, teamwork and learning ability.",
+        "hr",
+      ],
+      [
+        "HR interview",
+        "Documents, relocation, expectations and communication.",
+        "hr",
+      ],
+      ["Offer", "Offer letter and onboarding steps.", "offer"],
+    ],
+  ],
+  [
+    "Infosys",
+    0,
+    0.66,
+    "Logic and problem-solving test followed by interviews.",
+    [
+      [
+        "Registration",
+        "Apply through the campus or the official portal.",
+        "resume",
+      ],
+      [
+        "Online test",
+        "Reasoning, mathematical ability, verbal ability and pseudo-code. Specialist roles add harder coding.",
+        "aptitude",
+      ],
+      [
+        "Technical interview",
+        "Programming, DBMS, OOPs and your projects.",
+        "tech",
+      ],
+      [
+        "HR interview",
+        "Communication, flexibility and expectations.",
+        "hr",
+      ],
+      ["Offer", "Offer letter and onboarding steps.", "offer"],
+    ],
+  ],
+  [
+    "Wipro",
+    0,
+    0.6,
+    "Talent-hunt style online assessment.",
+    [
+      [
+        "Registration and resume",
+        "Register and submit your resume and academic details.",
+        "resume",
+      ],
+      [
+        "Online assessment",
+        "Aptitude, verbal and a coding section.",
+        "aptitude",
+      ],
+      [
+        "Technical interview",
+        "Core CS, projects and coding basics.",
+        "tech",
+      ],
+      [
+        "HR interview",
+        "Communication and expectations.",
+        "hr",
+      ],
+      ["Offer", "Offer letter and onboarding.", "offer"],
+    ],
+  ],
+  [
+    "Accenture",
+    0,
+    0.55,
+    "Cognitive and technical assessment with a communication check.",
+    [
+      [
+        "Application and resume",
+        "Apply with an up-to-date resume.",
+        "resume",
+      ],
+      [
+        "Cognitive and technical assessment",
+        "Logic and English questions, technical MCQs on networks, DBMS and OS, and possibly coding.",
+        "aptitude",
+      ],
+      [
+        "Communication assessment",
+        "A written or spoken English check.",
+        "hr",
+      ],
+      ["Interview", "Technical and HR discussion.", "tech"],
+      ["Offer", "Offer letter and onboarding.", "offer"],
+    ],
+  ],
+  [
+    "Adobe",
+    1,
+    0.38,
+    "Product company with coding-heavy interviews.",
+    [
+      [
+        "Resume screening",
+        "Projects with clear impact matter. Keep it to one page.",
+        "resume",
+      ],
+      [
+        "Online assessment",
+        "Coding problems and sometimes MCQs.",
+        "oa",
+      ],
+      [
+        "Technical interviews",
+        "Two or three rounds on data structures, problem solving and project discussion. Sometimes low-level design.",
+        "tech",
+      ],
+      [
+        "Managerial and HR",
+        "Team fit, motivation and expectations.",
+        "hr",
+      ],
+      ["Offer", "Offer discussion and joining.", "offer"],
+    ],
+  ],
+  [
+    "Uber",
+    1,
+    0.3,
+    "Fast-paced product company.",
+    [
+      [
+        "Resume screening",
+        "Highlight projects, internships and measurable results.",
+        "resume",
+      ],
+      [
+        "Online coding assessment",
+        "Timed algorithm problems.",
+        "oa",
+      ],
+      [
+        "Technical interviews",
+        "Coding rounds and design basics.",
+        "tech",
+      ],
+      [
+        "Hiring manager and behavioural",
+        "Past work, ownership and team fit.",
+        "hr",
+      ],
+      ["Offer", "Offer discussion.", "offer"],
+    ],
+  ],
+  [
+    "Amazon",
+    2,
+    0.22,
+    "Algorithms plus behavioural interviews based on leadership principles.",
+    [
+      [
+        "Application and resume",
+        "Tailor your resume. Use short bullets with numbers.",
+        "resume",
+      ],
+      [
+        "Online assessment",
+        "Coding problems, and for many roles a debugging or work-style section. Check the current format.",
+        "oa",
+      ],
+      [
+        "Interview loop (virtual)",
+        "Several back-to-back interviews: coding and data structures, plus behavioural questions on leadership principles. One interviewer acts as a bar raiser.",
+        "tech",
+      ],
+      [
+        "System design (for some roles)",
+        "Design a simple service and discuss trade-offs.",
+        "design",
+      ],
+      [
+        "Debrief and decision",
+        "The interviewers meet and decide together.",
+        "offer",
+      ],
+      ["Offer", "Offer discussion.", "offer"],
+    ],
+  ],
+  [
+    "Microsoft",
+    2,
+    0.18,
+    "Coding, problem solving and design conversations.",
+    [
+      [
+        "Resume screening",
+        "Projects and internships are weighed heavily.",
+        "resume",
+      ],
+      [
+        "Online coding assessment",
+        "Timed coding problems, format varies by year.",
+        "oa",
+      ],
+      [
+        "Interview loop",
+        "Three or four rounds: coding, problem solving, sometimes design, and behavioural questions.",
+        "tech",
+      ],
+      [
+        "Hiring manager conversation",
+        "Team fit and motivation.",
+        "hr",
+      ],
+      ["Offer", "Offer discussion.", "offer"],
+    ],
+  ],
+  [
+    "Google",
+    3,
+    0.08,
+    "Algorithm-heavy interviews with committee review.",
+    [
+      [
+        "Resume and application",
+        "Strong projects, clear impact and a concise resume.",
+        "resume",
+      ],
+      [
+        "Recruiter call",
+        "A short call about your background and interest.",
+        "hr",
+      ],
+      [
+        "Technical screen",
+        "One or two coding interviews on algorithms, by phone or video.",
+        "oa",
+      ],
+      [
+        "Virtual onsite loop",
+        "Four or five rounds: coding and algorithms, plus a behavioural round. System design is added for experienced roles.",
+        "tech",
+      ],
+      [
+        "Hiring committee review",
+        "A committee reviews the feedback.",
+        "offer",
+      ],
+      [
+        "Team matching and offer",
+        "You talk to teams, then receive an offer.",
+        "offer",
+      ],
+    ],
+  ],
+  [
+    "Netflix",
+    3,
+    0.05,
+    "Mostly hires experienced engineers. Entry-level hiring is limited, so verify current openings.",
+    [
+      [
+        "Recruiter conversation",
+        "Discuss the role, level and your experience.",
+        "hr",
+      ],
+      [
+        "Technical screen",
+        "Coding or problem-solving conversation.",
+        "oa",
+      ],
+      [
+        "Team interviews",
+        "Several interviews with the team: coding, system design and a deep discussion of your past work.",
+        "design",
+      ],
+      [
+        "Culture conversations",
+        "Discussion based on the company's published culture values.",
+        "hr",
+      ],
+      ["Offer", "Offer discussion.", "offer"],
+    ],
+  ],
+];
+

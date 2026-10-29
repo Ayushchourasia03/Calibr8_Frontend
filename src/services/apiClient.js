@@ -479,6 +479,13 @@ function handleMockFallback(endpoint, options = {}) {
     };
   }
 
+  if (cleanPath === "/auth/change-password" && method === "POST") {
+    return {
+      success: true,
+      message: "Password changed successfully.",
+    };
+  }
+
   // 9. Problems
   if (cleanPath === "/problems") {
     return {
@@ -514,6 +521,83 @@ function handleMockFallback(endpoint, options = {}) {
           timeLimit: 1000,
           memoryLimit: 256,
           _count: { testcases: 10, templates: 4 },
+        },
+      ],
+    };
+  }
+
+  if (cleanPath.startsWith("/problems/")) {
+    const slug = cleanPath.replace(/^\/problems\//, "");
+    return {
+      success: true,
+      data: {
+        id: "prob-1",
+        problemNumber: 1,
+        slug: slug || "two-sum-001",
+        title: slug
+          ? slug
+              .replace(/-/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase())
+          : "Two Sum",
+        description:
+          "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+        difficulty: "Easy",
+        timeLimit: 1000,
+        memoryLimit: 256,
+        testcases: [
+          {
+            testIndex: 0,
+            isVisible: true,
+            input: "4\n2 7 11 15\n9",
+            output: "0 1",
+            stdinSmall: "4\n2 7 11 15\n9",
+            expectedSmall: "0 1",
+          },
+        ],
+        templates: {
+          cpp: "class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n    }\n};",
+          java: "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n    }\n}",
+          python: "class Solution:\n    def twoSum(self, nums, target):\n        pass",
+          javascript: "class Solution {\n    twoSum(nums, target) {\n    }\n}",
+        },
+      },
+    };
+  }
+
+  if (cleanPath.startsWith("/topics/dsa/") && cleanPath.endsWith("/problems")) {
+    const parts = cleanPath.split("/");
+    const catSlug = parts[3] || "arrays-and-hashing";
+    return {
+      topic: {
+        id: `cat-${catSlug}`,
+        slug: catSlug,
+        name: catSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      },
+      count: 3,
+      problems: [
+        {
+          id: "prob-1",
+          problemNumber: 1,
+          slug: "two-sum-001",
+          title: "Two Sum",
+          difficulty: "Easy",
+          tags: ["Array", "Hash Table"],
+        },
+        {
+          id: "prob-2",
+          problemNumber: 2,
+          slug: "valid-parentheses",
+          title: "Valid Parentheses",
+          difficulty: "Easy",
+          tags: ["Stack", "String"],
+        },
+        {
+          id: "prob-3",
+          problemNumber: 3,
+          slug: "longest-calm-window",
+          title: "Longest Calm Window",
+          difficulty: "Medium",
+          tags: ["Sliding Window"],
         },
       ],
     };
@@ -619,6 +703,23 @@ function handleMockFallback(endpoint, options = {}) {
     return { success: true, submission: sub };
   }
 
+  // 11. Social
+  if (cleanPath === "/social" || cleanPath.startsWith("/social/")) {
+    if (cleanPath.endsWith("/link-url")) {
+      return {
+        success: true,
+        url: "#connected-github",
+      };
+    }
+    if (method === "DELETE") {
+      return {
+        success: true,
+        message: "Successfully unlinked account.",
+      };
+    }
+    return { success: true, accounts: [] };
+  }
+
   // 12. Study
   if (cleanPath === "/study/subjects") {
     return [
@@ -661,6 +762,117 @@ function handleMockFallback(endpoint, options = {}) {
     ];
   }
 
+  if (cleanPath.startsWith("/study/subjects/")) {
+    const subSlug = cleanPath.split("/")[3] || "oops";
+    return {
+      id: `subj-${subSlug}`,
+      slug: subSlug,
+      name: subSlug.toUpperCase(),
+      order: 1,
+      chapters: [
+        {
+          id: `chap-${subSlug}-1`,
+          slug: `${subSlug}-fundamentals`,
+          name: `${subSlug.toUpperCase()} Fundamentals & Core Concepts`,
+          order: 1,
+          _count: { topics: 3 },
+        },
+        {
+          id: `chap-${subSlug}-2`,
+          slug: `${subSlug}-advanced`,
+          name: `${subSlug.toUpperCase()} Advanced Patterns & Architecture`,
+          order: 2,
+          _count: { topics: 3 },
+        },
+      ],
+    };
+  }
+
+  if (cleanPath.startsWith("/study/chapters/") && cleanPath.endsWith("/topics")) {
+    const chapId = cleanPath.split("/")[3] || "chap-1";
+    return [
+      {
+        id: `${chapId}-top-1`,
+        slug: `${chapId}-foundations`,
+        name: "Foundations & Architectural Principles",
+        order: 1,
+      },
+      {
+        id: `${chapId}-top-2`,
+        slug: `${chapId}-deep-dive`,
+        name: "Deep Dive & Under the Hood Mechanics",
+        order: 2,
+      },
+      {
+        id: `${chapId}-top-3`,
+        slug: `${chapId}-interview-problems`,
+        name: "Interview Case Studies & Real Scenarios",
+        order: 3,
+      },
+    ];
+  }
+
+  if (cleanPath.startsWith("/study/topics/") && cleanPath.endsWith("/submit") && method === "POST") {
+    const answers = body.answers || {};
+    const totalQuestions = Object.keys(answers).length || 2;
+    return {
+      success: true,
+      totalQuestions,
+      score: totalQuestions,
+      percentage: 100,
+      results: Object.entries(answers).map(([mcqId, ans]) => ({
+        mcqId,
+        correct: true,
+        userAnswer: ans,
+        correctIndex: ans,
+        explanation: "Correct! Outstanding conceptual mastery.",
+      })),
+    };
+  }
+
+  if (cleanPath.startsWith("/study/topics/")) {
+    const topicSlug = cleanPath.replace(/^\/study\/topics\//, "");
+    return {
+      id: `top-${topicSlug}`,
+      slug: topicSlug,
+      name: topicSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      content: `# ${topicSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}\n\n## Overview\nCore principles and high-frequency technical questions.\n\n### Key Concepts\n- Memory and time complexity tradeoffs\n- System scalability and concurrency\n- Robust edge-case management\n`,
+      order: 1,
+      isPublished: true,
+      chapter: {
+        slug: "fundamentals",
+        name: "Core Foundations",
+        subject: { slug: "core", name: "Core CS" },
+      },
+      mcqs: [
+        {
+          id: `mcq-1`,
+          question: "Which of the following best characterizes this concept?",
+          options: [
+            "Optimal performance with bounded memory overhead",
+            "Linear time complexity guarantee",
+            "Hardware-dependent memory management",
+            "Dynamic compilation requirement",
+          ],
+          difficulty: "Easy",
+          order: 1,
+        },
+        {
+          id: `mcq-2`,
+          question: "What is the primary architectural advantage?",
+          options: [
+            "Decoupling and modular extensibility",
+            "Increased memory fragmentation",
+            "Sequential instruction pipelining",
+            "Single-threaded execution",
+          ],
+          difficulty: "Medium",
+          order: 2,
+        },
+      ],
+    };
+  }
+
   // 13. Themes
   if (cleanPath === "/themes") {
     return {
@@ -675,6 +887,26 @@ function handleMockFallback(endpoint, options = {}) {
       coins: mockStore.currentUser?.coins ?? 120,
       activeTheme: "default",
       ownedThemes: ["default"],
+    };
+  }
+  if (cleanPath === "/themes/apply" && (method === "PUT" || method === "POST")) {
+    const slug = body.slug || "default";
+    return {
+      success: true,
+      activeTheme: slug,
+      message: `Applied ${slug} theme.`,
+    };
+  }
+  if (cleanPath.startsWith("/themes/") && cleanPath.endsWith("/buy") && method === "POST") {
+    const slug = cleanPath.split("/")[2] || "default";
+    if (mockStore.currentUser) {
+      mockStore.currentUser.coins = Math.max(0, (mockStore.currentUser.coins || 120) - 100);
+    }
+    return {
+      success: true,
+      coins: mockStore.currentUser?.coins ?? 20,
+      purchasedTheme: slug,
+      message: `Successfully purchased ${slug} theme.`,
     };
   }
 
@@ -730,6 +962,12 @@ function handleMockFallback(endpoint, options = {}) {
  */
 export async function request(endpoint, options = {}) {
   const { disableMockFallback = false, ...requestOptions } = options;
+
+  // If no external backend configured, immediately use offline mock fallback
+  if (!disableMockFallback && !apiConfig.getBaseUrl()) {
+    return handleMockFallback(endpoint, requestOptions);
+  }
+
   const headers = {
     "Content-Type": "application/json",
     ...(requestOptions.headers || {}),
@@ -754,6 +992,15 @@ export async function request(endpoint, options = {}) {
       data = await response.json();
     } else {
       data = await response.text();
+    }
+
+    // If server returned HTML fallback (Vite SPA catch-all) instead of API JSON
+    if (
+      !disableMockFallback &&
+      typeof data === "string" &&
+      (data.includes("<!doctype html>") || data.includes("<html"))
+    ) {
+      return handleMockFallback(endpoint, requestOptions);
     }
 
     if (!response.ok) {

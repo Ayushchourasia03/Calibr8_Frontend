@@ -1,72 +1,230 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import { ymd } from "../../utils/tierUtils";
-import { ConnectedAccounts } from "./ConnectedAccounts";
+import { ymd, ShieldBadge } from "../../utils/tierUtils";
+import { DIFFICULTY_LABELS } from "../../data/constants";
 
 const AVATARS = [
   "🙂", "😎", "🤓", "🧑‍💻", "👩‍💻", "🧑‍🚀", "🦊", "🐼", "🚀", "🎮",
 ];
+
+const DEGREES = ["B.Tech", "B.E.", "BCA", "B.Sc", "M.Tech", "MCA", "Other"];
+const BRANCHES = [
+  "Computer Science",
+  "Information Technology",
+  "Electronics and Communication",
+  "Electrical",
+  "Mechanical",
+  "Civil",
+  "AI and ML",
+  "Data Science",
+  "Other",
+];
+const YEARS = [2026, 2027, 2028, 2029, 2030, 2031];
+
+const COLLEGES = {
+  "Uttar Pradesh": [
+    "IIT Kanpur",
+    "IIT (BHU) Varanasi",
+    "IIIT Allahabad",
+    "MNNIT Allahabad",
+    "KIET Group of Institutions, Ghaziabad",
+    "AKGEC Ghaziabad",
+    "ABES Engineering College, Ghaziabad",
+    "Amity University, Noida",
+    "Galgotias University",
+    "Jaypee Institute of Information Technology, Noida",
+    "Bennett University",
+  ],
+  Delhi: [
+    "IIT Delhi",
+    "IIIT Delhi",
+    "Delhi Technological University",
+    "NSUT Delhi",
+    "Jamia Millia Islamia",
+    "Maharaja Agrasen Institute of Technology",
+    "Bharati Vidyapeeth College of Engineering",
+  ],
+  Haryana: [
+    "NIT Kurukshetra",
+    "IIIT Sonepat",
+    "Amity University Gurugram",
+    "Maharshi Dayanand University",
+    "Manav Rachna University",
+  ],
+  Maharashtra: [
+    "IIT Bombay",
+    "VJTI Mumbai",
+    "COEP Pune",
+    "VIT Pune",
+    "Pune Institute of Computer Technology",
+    "VNIT Nagpur",
+  ],
+  Karnataka: [
+    "IIT Dharwad",
+    "NITK Surathkal",
+    "RV College of Engineering",
+    "PES University",
+    "BMS College of Engineering",
+    "IISc Bangalore",
+  ],
+  "Tamil Nadu": [
+    "IIT Madras",
+    "NIT Tiruchirappalli",
+    "Anna University",
+    "SRM Institute of Science and Technology",
+    "VIT Vellore",
+    "PSG College of Technology",
+  ],
+  Telangana: [
+    "IIT Hyderabad",
+    "IIIT Hyderabad",
+    "NIT Warangal",
+    "JNTU Hyderabad",
+    "CBIT Hyderabad",
+  ],
+  "West Bengal": [
+    "IIT Kharagpur",
+    "Jadavpur University",
+    "NIT Durgapur",
+    "IIEST Shibpur",
+  ],
+  Rajasthan: ["IIT Jodhpur", "MNIT Jaipur", "BITS Pilani", "LNMIIT Jaipur"],
+  Gujarat: [
+    "IIT Gandhinagar",
+    "DA-IICT Gandhinagar",
+    "NIT Surat",
+    "Nirma University",
+  ],
+  "Madhya Pradesh": [
+    "IIT Indore",
+    "IIIT Gwalior",
+    "MANIT Bhopal",
+    "SGSITS Indore",
+  ],
+  Punjab: [
+    "IIT Ropar",
+    "Thapar Institute of Engineering and Technology",
+    "Chitkara University",
+  ],
+  "Other state or union territory": [],
+};
+
+const ago = (t) => {
+  const m = Math.round((Date.now() - t) / 6e4);
+  return m < 1
+    ? "just now"
+    : m < 60
+    ? `${m} min ago`
+    : m < 1440
+    ? `${Math.round(m / 60)} h ago`
+    : `${Math.round(m / 1440)} d ago`;
+};
 
 export function ProfileView() {
   const {
     state,
     setState,
     tierInfo,
-    showToast,
-    updateProfileName,
-    updateAcademicProfile,
     setActiveModal,
     setModalData,
-    logout,
+    getTopicRating,
   } = useCalibr8();
-  const [activityMode, setActivityMode] = useState("y"); // 'y' = year (heat), 'm' = monthly (mbar)
 
-  const isGuest = !state.user || state.user.guest;
+  const [act, setAct] = useState(state.act || "y");
+
   const myName =
     state.name ||
-    (!isGuest ? state.user.email?.split("@")[0] : "Learner");
+    (state.user && !state.user.guest
+      ? state.user.email?.split("@")[0]
+      : "You");
 
-  // 53-week heatmap
-  const n = new Date();
-  const A = state.activity || {};
-  const heatmapBoxes = [];
-  const start = new Date(
-    n.getFullYear(),
-    n.getMonth(),
-    n.getDate() - n.getDay() - 52 * 7,
+  const P = Object.assign(
+    {
+      country: "India",
+      state: "Uttar Pradesh",
+      college: "AKGEC Ghaziabad",
+      other: "",
+      degree: "B.Tech",
+      branch: "Computer Science",
+      year: "2026",
+    },
+    state.prof || {}
   );
 
-  for (let i = 0; i < 53 * 7; i++) {
-    const d = new Date(
-      start.getFullYear(),
-      start.getMonth(),
-      start.getDate() + i,
+  const n = useMemo(() => new Date(), []);
+  const A = useMemo(() => state.activity || {}, [state.activity]);
+  const solvesCount = Object.keys(state.best || {}).length;
+  const L = state.levels || {};
+
+  // Build Heatmap
+  const { heatCells, monthLabels } = useMemo(() => {
+    let ml = [];
+    const start = new Date(
+      n.getFullYear(),
+      n.getMonth(),
+      n.getDate() - n.getDay() - 52 * 7
     );
-    if (d > n) {
-      heatmapBoxes.push({ visible: false, key: `f_${i}` });
-      continue;
+    let last = -9,
+      lm = -1;
+    for (let w = 0; w < 53; w++) {
+      const d0 = new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate() + w * 7
+      );
+      if (d0.getMonth() !== lm && w - last >= 3) {
+        ml.push(
+          <span key={w} style={{ gridColumn: w + 1 }}>
+            {d0.toLocaleString("en-US", { month: "short" })}
+          </span>
+        );
+        last = w;
+      }
+      lm = d0.getMonth();
     }
-    const k = ymd(d.getFullYear(), d.getMonth(), d.getDate());
-    const count = A[k] || 0;
-    heatmapBoxes.push({
-      visible: true,
-      key: k,
-      count,
-    });
-  }
+
+    const cells = [];
+    for (let i = 0; i < 53 * 7; i++) {
+      const d = new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate() + i
+      );
+      if (d > n) {
+        cells.push(<i key={`f_${i}`} style={{ visibility: "hidden" }} />);
+        continue;
+      }
+      const k = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+      const c = A[k] || 0;
+      const hClass = c >= 4 ? "h3" : c >= 2 ? "h2" : c >= 1 ? "h1" : "";
+      cells.push(
+        <i key={k} className={hClass} title={`${k}: ${c} submission(s)`} />
+      );
+    }
+
+    return { heatCells: cells, monthLabels: ml };
+  }, [n, A]);
 
   // Monthly breakdown
-  const monthlyData = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(n.getFullYear(), n.getMonth() - i, 1);
-    const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const count = Object.keys(A)
-      .filter((k) => k.startsWith(prefix))
-      .reduce((sum, k) => sum + A[k], 0);
-    monthlyData.push([d.toLocaleString("en-US", { month: "short" }), count]);
-  }
-  const maxMonthly = Math.max(1, ...monthlyData.map((x) => x[1]));
-  const totalSubmissions = Object.values(A).reduce((a, b) => a + b, 0);
+  const monthlyData = useMemo(() => {
+    const list = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(n.getFullYear(), n.getMonth() - i, 1);
+      const p = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}`;
+      const count = Object.keys(A)
+        .filter((k) => k.startsWith(p))
+        .reduce((sum, k) => sum + A[k], 0);
+      list.push([d.toLocaleString("en-US", { month: "short" }), count]);
+    }
+    return list;
+  }, [n, A]);
+
+  const maxMonth = Math.max(1, ...monthlyData.map((x) => x[1]));
+  const totalSubs = Object.values(A).reduce((a, b) => a + b, 0);
+  const activeDays = Object.keys(A).length;
 
   // Rating history chart
   const H = state.hist || [
@@ -79,407 +237,459 @@ export function ProfileView() {
   const lo = Math.min(...rs) - 40;
   const hi = Math.max(...rs) + 40;
   const W = 520;
-  const Hh = 130;
+  const Hh = 150;
   const points = H.map(
     (h, i) =>
-      `${((i / (H.length - 1)) * W).toFixed(1)},${(Hh - ((h.r - lo) / (hi - lo)) * Hh).toFixed(1)}`,
+      `${((i / (H.length - 1)) * W).toFixed(1)},${(
+        Hh -
+        ((h.r - lo) / (hi - lo)) * Hh
+      ).toFixed(1)}`
   ).join(" ");
 
-  const handleCopyShare = () => {
-    navigator.clipboard?.writeText(
-      `Calibr8 Verified Skill Rank: ${tierInfo.full} (${state.rating || 1630} ELO)\nStreak: ${state.streak || 46} days\nCalibrating deliberate engineering daily at Calibr8.`,
-    );
-    showToast("Share text copied to clipboard!");
+  // Badges
+  const badges = [
+    ["First solve", solvesCount >= 1, "🎯"],
+    ["7-day streak", Math.max(state.longest || 0, state.streak || 0) >= 7, "🔥"],
+    ["Word collector", (state.wordsLearned || 0) >= 10, "📖"],
+    [
+      "Strict solver",
+      (state.recent || []).some((r) => r.mode === "strict" && r.tier > 0),
+      "🛡️",
+    ],
+    ["Tier revealed", !state.calibrating, "⭐"],
+    ["Note taker", Object.values(state.notes || {}).some(Boolean), "📝"],
+  ];
+
+  const handleProfileFieldChange = (field, value) => {
+    const updated = { ...P, [field]: value };
+    const resolvedCollege =
+      updated.college === "Other (type below)" || updated.country === "Other"
+        ? updated.other
+        : updated.college;
+
+    setState((s) => ({
+      ...s,
+      prof: updated,
+      college: resolvedCollege,
+    }));
   };
 
-  const handleCopyStory = () => {
-    navigator.clipboard?.writeText(
-      `#Calibr8 Rank: ${tierInfo.full} • Rating: ${state.rating || 1630} • Streak: ${state.streak || 46}d 🔥`,
-    );
-    showToast("Story text copied to clipboard!");
+  const handleNameChange = (e) => {
+    const name = e.target.value;
+    setState((s) => ({ ...s, name }));
   };
 
-  const tierInitials = tierInfo.full
-    .split(" ")
-    .map((x) => x[0])
-    .join("");
+  const handleAvatarSelect = (av) => {
+    setState((s) => ({ ...s, avatar: av }));
+  };
+
+  const handleActToggle = (mode) => {
+    setAct(mode);
+    setState((s) => ({ ...s, act: mode }));
+  };
+
+  const stateColleges = COLLEGES[P.state] || [];
+  const showCustomCollege =
+    P.college === "Other (type below)" || P.country === "Other";
 
   return (
     <div>
-      <div style={{ marginBottom: "16px" }}>
-        <h1>Learner Profile</h1>
-        <p className="mu" style={{ margin: "4px 0" }}>
-          Verified calibration, activity heatmaps, and shareable rank cards.
-        </p>
-      </div>
+      <h1>Profile</h1>
 
-      {/* Identity Card */}
-      <div className="card" style={{ display: "flex", gap: "20px", alignItems: "center", flexWrap: "wrap", marginBottom: "16px" }}>
-        <div className="av big2">{state.avatar || "🙂"}</div>
-
-        <div style={{ flex: 1, minWidth: "220px" }}>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-            <input
-              type="text"
-              value={state.name || ""}
-              placeholder="Your full name"
-              onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
-              onBlur={(e) => updateProfileName(e.target.value.trim())}
-              style={{ fontSize: "16px", fontWeight: "bold", padding: "6px 10px" }}
-            />
+      <div className="grid">
+        {/* Profile Card */}
+        <div className="card" style={{ gridColumn: "1/-1" }}>
+          <div className="phead">
+            <span className="av big2">{state.avatar || "🙂"}</span>
+            <div className="pinfo">
+              <h2 style={{ margin: 0 }}>{myName}</h2>
+              <p className="mu" style={{ margin: "2px 0" }}>
+                {state.user
+                  ? state.user.guest
+                    ? "Guest on this device"
+                    : state.user.email
+                  : "Not signed in"}
+                {state.college ? ` · ${state.college}` : ""}
+              </p>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <ShieldBadge
+                tierIndex={tierInfo.i}
+                divisionIndex={tierInfo.dv}
+                size={84}
+                calibrating={state.calibrating}
+              />
+              <div>
+                <b>{state.calibrating ? "Calibrating" : tierInfo.full}</b>
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
-            <input
-              type="text"
-              value={state.college || ""}
-              placeholder="College / Organization name"
-              onChange={(e) => setState((s) => ({ ...s, college: e.target.value }))}
-              onBlur={(e) => updateAcademicProfile({ college: e.target.value.trim() })}
-              style={{ fontSize: "13px", padding: "5px 10px", width: "100%", maxWidth: "300px" }}
-            />
-          </div>
-
-          {/* Avatar selector */}
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+          <div className="row" style={{ marginTop: "10px" }}>
             {AVATARS.map((av) => (
               <button
                 key={av}
-                onClick={() => setState((s) => ({ ...s, avatar: av }))}
-                style={{
-                  background: state.avatar === av ? "var(--ac)" : "var(--cf)",
-                  border: "1px solid var(--ln)",
-                  borderRadius: "50%",
-                  width: "32px",
-                  height: "32px",
-                  fontSize: "16px",
-                  cursor: "pointer",
-                  display: "grid",
-                  placeItems: "center",
-                }}
+                className={`pill avp ${
+                  av === (state.avatar || "🙂") ? "on" : ""
+                }`}
+                onClick={() => handleAvatarSelect(av)}
               >
                 {av}
               </button>
             ))}
           </div>
-        </div>
 
-        <div style={{ textAlign: "center" }}>
-          <div
-            className="badge"
-            style={{ "--tc": tierInfo.color, margin: "0 auto 6px" }}
-          >
-            {tierInitials}
-          </div>
-          <span className="tbg" style={{ "--tc": tierInfo.color }}>
-            {tierInfo.full}
-          </span>
-        </div>
-      </div>
+          <h3 style={{ marginTop: "18px" }}>About you</h3>
+          <div className="pf">
+            <label>
+              Name
+              <input
+                id="pn"
+                value={myName === "You" ? "" : myName}
+                placeholder="Your name"
+                onChange={handleNameChange}
+              />
+            </label>
 
-      {/* Account & Calibration Bar */}
-      <div
-        className="card"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "12px",
-          marginBottom: "16px",
-          background: "rgba(255, 255, 255, 0.04)",
-          border: "1px solid var(--ln)",
-        }}
-      >
-        <div>
-          <div style={{ fontSize: "14px", fontWeight: 700 }}>
-            {isGuest ? (
-              <span>Guest Account</span>
-            ) : (
-              <span>
-                Signed in as <b>{state.user.email}</b>
-              </span>
+            <label>
+              Country
+              <select
+                id="pco"
+                value={P.country}
+                onChange={(e) => handleProfileFieldChange("country", e.target.value)}
+              >
+                <option value="India">India</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              State
+              <select
+                id="pst"
+                value={P.state}
+                onChange={(e) => {
+                  handleProfileFieldChange("state", e.target.value);
+                  handleProfileFieldChange("college", "");
+                }}
+              >
+                <option value="">Select state</option>
+                {Object.keys(COLLEGES).map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              College
+              <select
+                id="pcl"
+                value={P.college}
+                onChange={(e) => handleProfileFieldChange("college", e.target.value)}
+              >
+                <option value="">Select college</option>
+                {stateColleges.map((col) => (
+                  <option key={col} value={col}>
+                    {col}
+                  </option>
+                ))}
+                <option value="Other (type below)">Other (type below)</option>
+              </select>
+            </label>
+
+            {showCustomCollege && (
+              <label id="pcnw">
+                College name
+                <input
+                  id="pcn"
+                  value={P.other}
+                  placeholder="Type your college"
+                  onChange={(e) => handleProfileFieldChange("other", e.target.value)}
+                />
+              </label>
             )}
-          </div>
-          <div className="mu" style={{ fontSize: "12px" }}>
-            Editor language: <b>{state.lang || "Python"}</b> • Calibrated topics:{" "}
-            <b>{Object.keys(state.levels || {}).length}</b>
+
+            <label>
+              Degree
+              <select
+                id="pdg"
+                value={P.degree}
+                onChange={(e) => handleProfileFieldChange("degree", e.target.value)}
+              >
+                {DEGREES.map((deg) => (
+                  <option key={deg} value={deg}>
+                    {deg}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Branch
+              <select
+                id="pbr"
+                value={P.branch}
+                onChange={(e) => handleProfileFieldChange("branch", e.target.value)}
+              >
+                <option value="">Select branch</option>
+                {BRANCHES.map((br) => (
+                  <option key={br} value={br}>
+                    {br}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Graduation year
+              <select
+                id="pyr"
+                value={P.year}
+                onChange={(e) => handleProfileFieldChange("year", e.target.value)}
+              >
+                <option value="">Select year</option>
+                {YEARS.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <button
-            className="btn ghost"
-            style={{ fontSize: "12px", padding: "5px 12px" }}
-            onClick={() => {
-              setModalData({ step: 1 });
-              setActiveModal("onboarding");
-            }}
-          >
-            🎯 Calibrate Topics
-          </button>
-          <button
-            className="btn ghost"
-            style={{ fontSize: "12px", padding: "5px 12px" }}
-            onClick={() => {
-              setModalData({ step: 2 });
-              setActiveModal("onboarding");
-            }}
-          >
-            ⚙️ Language ({state.lang || "Python"})
-          </button>
-          {isGuest ? (
-            <button
-              className="btn"
-              style={{ fontSize: "12px", padding: "5px 12px" }}
-              onClick={() => {
-                setModalData({ step: 0 });
-                setActiveModal("onboarding");
-              }}
-            >
-              Log in / Register
-            </button>
+        {/* Stats Card */}
+        <div className="card">
+          <h2>Stats</h2>
+          <div className="tr">
+            <span>Questions solved</span>
+            <b>{solvesCount}</b>
+          </div>
+          <div className="tr">
+            <span>Score</span>
+            <b>{Math.floor((state.score || 0) / 10).toLocaleString()}</b>
+          </div>
+          <div className="tr">
+            <span>Coins</span>
+            <b>{state.coins || 0}</b>
+          </div>
+          <div className="tr">
+            <span>Streak (best {Math.max(state.longest || 0, state.streak || 0)})</span>
+            <b>{state.streak || 0}</b>
+          </div>
+          <div className="tr">
+            <span>Words learned</span>
+            <b>{state.wordsLearned || 0}</b>
+          </div>
+        </div>
+
+        {/* Tier Graph Card */}
+        <div className="card">
+          <h2>Tier graph</h2>
+          {H.length >= 2 ? (
+            <div>
+              <svg viewBox={`0 0 ${W} ${Hh}`} style={{ width: "100%", height: "150px" }}>
+                <polyline
+                  points={points}
+                  fill="none"
+                  stroke={tierInfo.color || "#2F7BFF"}
+                  strokeWidth="3"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <p className="mu">
+                Rating {rs[0]} to {rs[rs.length - 1]} over {H.length} solves.
+              </p>
+            </div>
           ) : (
-            <button
-              className="btn ghost"
-              style={{ fontSize: "12px", padding: "5px 12px", borderColor: "rgba(255, 107, 129, 0.4)", color: "#ff6b81" }}
-              onClick={async () => {
-                await logout();
-                showToast("Signed out successfully.");
-              }}
-            >
-              Sign out
-            </button>
+            <p className="mu">Solve a few questions and your tier graph will draw here.</p>
           )}
         </div>
-      </div>
 
-      {/* 4 Stats Grid */}
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "16px" }}>
-        <div className="card">
-          <div className="mu">Verified Rating</div>
-          <div className="big">{state.rating || 1630}</div>
-          <div className="mu" style={{ fontSize: "12px" }}>
-            {state.calibrating ? "Calibrating..." : tierInfo.full}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="mu">Daily Streak</div>
-          <div className="big">{state.streak || 46}d</div>
-          <div className="mu" style={{ fontSize: "12px" }}>
-            Active flame status 🔥
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="mu">Total Solves</div>
-          <div className="big">{state.solves || 6}</div>
-          <div className="mu" style={{ fontSize: "12px" }}>
-            Questions completed
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="mu">Strict Mode Verified</div>
-          <div className="big">95%</div>
-          <div className="mu" style={{ fontSize: "12px" }}>
-            Fullscreen timed attempts
-          </div>
-        </div>
-      </div>
-
-      {/* Activity Heatmap Card */}
-      <div className="card" style={{ marginBottom: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
-          <div>
-            <h3>Activity History</h3>
-            <span className="mu">
-              <b>{totalSubmissions}</b> total submissions recorded
+        {/* Activity Card */}
+        <div className="card" style={{ gridColumn: "1/-1" }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", margin: 0 }}
+          >
+            <h2 style={{ margin: 0 }}>Activity</h2>
+            <span>
+              <button
+                className={`pill ${act === "y" ? "on" : ""}`}
+                onClick={() => handleActToggle("y")}
+              >
+                Annual
+              </button>{" "}
+              <button
+                className={`pill ${act === "m" ? "on" : ""}`}
+                onClick={() => handleActToggle("m")}
+              >
+                Monthly
+              </button>
             </span>
           </div>
-
-          <div style={{ display: "flex", gap: "6px" }}>
-            <button
-              className={`pill ${activityMode === "y" ? "on" : ""}`}
-              onClick={() => setActivityMode("y")}
-            >
-              53 Weeks
-            </button>
-            <button
-              className={`pill ${activityMode === "m" ? "on" : ""}`}
-              onClick={() => setActivityMode("m")}
-            >
-              12 Months
-            </button>
-          </div>
-        </div>
-
-        {activityMode === "y" ? (
-          <div>
-            <div className="heat">
-              {heatmapBoxes.map((box) => {
-                if (!box.visible) {
-                  return <i key={box.key} style={{ opacity: 0 }} />;
-                }
-                const level =
-                  box.count >= 3
-                    ? "h3"
-                    : box.count === 2
-                      ? "h2"
-                      : box.count === 1
-                        ? "h1"
-                        : "";
-                return (
-                  <i
-                    key={box.key}
-                    className={level}
-                    title={`${box.key}: ${box.count} submissions`}
-                  />
-                );
-              })}
+          <p className="mu">
+            {totalSubs} submission(s) in the last year, {activeDays} active day(s), best streak{" "}
+            {Math.max(state.longest || 0, state.streak || 0)}.
+          </p>
+          {act === "y" ? (
+            <div className="hmw">
+              <div className="ml">{monthLabels}</div>
+              <div className="heat">{heatCells}</div>
             </div>
-            <div className="row" style={{ justifyContent: "flex-end", fontSize: "11px", gap: "4px", marginTop: "8px" }}>
-              <span className="mu">Less</span>
-              <i style={{ width: "11px", height: "11px", borderRadius: "2px", background: "var(--cf)" }} />
-              <i style={{ width: "11px", height: "11px", borderRadius: "2px", background: "rgba(47, 123, 255, 0.35)" }} />
-              <i style={{ width: "11px", height: "11px", borderRadius: "2px", background: "rgba(47, 123, 255, 0.65)" }} />
-              <i style={{ width: "11px", height: "11px", borderRadius: "2px", background: "#2F7BFF" }} />
-              <span className="mu">More</span>
-            </div>
-          </div>
-        ) : (
-          <div className="mbar">
-            {monthlyData.map(([mo, cnt]) => {
-              const hPct = Math.max(8, Math.round((cnt / maxMonthly) * 100));
-              return (
-                <div key={mo}>
-                  <i style={{ height: `${hPct}%` }} title={`${mo}: ${cnt}`} />
-                  <span>{mo}</span>
+          ) : (
+            <div className="mbar">
+              {monthlyData.map(([label, count]) => (
+                <div key={label}>
+                  <i style={{ height: `${Math.max(3, (count / maxMonth) * 90)}px` }} />
+                  <span>{label}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Rating Trajectory Chart */}
-      <div className="card" style={{ marginBottom: "16px" }}>
-        <h3>Rating Calibration Trajectory</h3>
-        <p className="mu" style={{ margin: "2px 0 10px", fontSize: "12px" }}>
-          Elo rating adjustments from verified question solves.
-        </p>
-
-        <div style={{ width: "100%", overflowX: "auto" }}>
-          <svg
-            viewBox={`0 0 ${W} ${Hh}`}
-            style={{ width: "100%", maxHeight: "150px", display: "block" }}
-          >
-            <defs>
-              <linearGradient id="gLine" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#2F7BFF" />
-                <stop offset="50%" stopColor="#6B6BFF" />
-                <stop offset="100%" stopColor="#B16BFF" />
-              </linearGradient>
-            </defs>
-            <polyline
-              fill="none"
-              stroke="url(#gLine)"
-              strokeWidth="3"
-              points={points}
-            />
-            {H.map((h, i) => {
-              const cx = (i / (H.length - 1)) * W;
-              const cy = Hh - ((h.r - lo) / (hi - lo)) * Hh;
-              return (
-                <circle
-                  key={i}
-                  cx={cx}
-                  cy={cy}
-                  r="4"
-                  fill="#fff"
-                  stroke="#2F7BFF"
-                  strokeWidth="2"
-                />
-              );
-            })}
-          </svg>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Connected Accounts Section */}
-      <div style={{ marginBottom: "16px" }}>
-        <ConnectedAccounts
-          onRequireAuth={() => {
-            setModalData({ step: 0 });
-            setActiveModal("onboarding");
-          }}
-        />
-      </div>
-
-      {/* Share Cards Row */}
-      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "stretch" }}>
-        {/* LinkedIn share card */}
-        <div className="share" style={{ flex: 1, minWidth: "280px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-            <div style={{ font: "700 18px 'Space Grotesk', serif" }}>
-              Calibr<b>8</b> Verified Rank
+        {/* Recent Submissions Card */}
+        <div className="card" style={{ gridColumn: "1/-1" }}>
+          <h2>Recent submissions</h2>
+          {(state.recent || []).length > 0 ? (
+            <div style={{ overflowX: "auto" }}>
+              <table className="rvt">
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Topic</th>
+                    <th>Mode</th>
+                    <th>Result</th>
+                    <th>Points</th>
+                    <th>Notes</th>
+                    <th>When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(state.recent || []).map((r, idx) => {
+                    const nt = (state.notes || {})[r.k] || "";
+                    return (
+                      <tr key={idx}>
+                        <td>
+                          <b>{r.t}</b>
+                        </td>
+                        <td>
+                          <span className="tag">{r.tp || "-"}</span>
+                        </td>
+                        <td>
+                          <span
+                            className="tag"
+                            style={{
+                              color: r.mode === "strict" ? "#FF8A9B" : "#7EE7DB",
+                            }}
+                          >
+                            {r.mode === "strict" ? "Strict" : "Relaxed"}
+                          </span>
+                        </td>
+                        <td>{r.tier ? `Tier ${r.tier}` : "Not solved"}</td>
+                        <td>+{r.pts}</td>
+                        <td className="mu" title={nt}>
+                          {nt ? (nt.length > 36 ? `${nt.slice(0, 36)}...` : nt) : "-"}
+                        </td>
+                        <td className="mu">{ago(r.at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <span style={{ fontSize: "12px", opacity: 0.8 }}>LinkedIn Share</span>
-          </div>
+          ) : (
+            <p className="mu">No submissions yet.</p>
+          )}
+        </div>
 
-          <div style={{ margin: "14px 0" }}>
-            <div style={{ fontSize: "24px", fontWeight: "bold" }}>{myName}</div>
-            <div style={{ opacity: 0.8, fontSize: "13px" }}>
-              {state.college || "Software Engineering"}
-            </div>
-            <div style={{ marginTop: "12px", display: "flex", gap: "12px", alignItems: "center" }}>
-              <div
-                className="badge"
-                style={{ "--tc": tierInfo.color, width: "60px", height: "60px", fontSize: "20px" }}
+        {/* Badges Card */}
+        <div className="card">
+          <h2>Badges</h2>
+          <div className="row">
+            {badges.map(([title, unlocked, icon]) => (
+              <span
+                key={title}
+                className="tag"
+                style={{ opacity: unlocked ? 1 : 0.4 }}
+                title={title}
               >
-                {tierInitials}
-              </div>
-              <div>
-                <div style={{ fontSize: "18px", fontWeight: "bold" }}>{tierInfo.full}</div>
-                <div style={{ fontSize: "13px", opacity: 0.8 }}>
-                  Rating: {state.rating || 1630} • Streak: {state.streak || 46}d
-                </div>
-              </div>
-            </div>
+                {icon} {title}
+              </span>
+            ))}
           </div>
-
-          <button
-            className="btn ghost"
-            style={{ width: "100%", color: "#fff", borderColor: "rgba(255,255,255,0.3)" }}
-            onClick={handleCopyShare}
-          >
-            Copy LinkedIn Share Post 📋
-          </button>
         </div>
 
-        {/* Instagram vertical clip */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-          <div className="clip">
-            <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
-              Calibr8
+        {/* LinkedIn Shareable Card */}
+        <div className="card">
+          <h2>LinkedIn card</h2>
+          <div className="share">
+            <div className="mu" style={{ color: "#7EE7DB" }}>
+              CALIBR8
             </div>
-            <div style={{ fontSize: "36px", marginBottom: "4px" }}>{state.avatar || "🙂"}</div>
-            <div style={{ fontSize: "15px", marginBottom: "2px" }}>{myName}</div>
-            <div style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px" }}>
-              {tierInfo.full}
+            <h2 style={{ color: "#fff" }}>{myName}</h2>
+            <div>
+              {state.calibrating ? "Calibrating" : tierInfo.full} · Rating{" "}
+              {tierInfo.R || state.rating}
             </div>
-            <div style={{ fontSize: "22px", fontWeight: "800" }}>{state.rating || 1630}</div>
-            <div style={{ fontSize: "10px", opacity: 0.8 }}>ELO Rating</div>
-            <div style={{ marginTop: "8px", fontSize: "11px" }}>🔥 {state.streak || 46} Days</div>
+            <div>
+              Solved {solvesCount} · Streak {state.streak || 0} days
+            </div>
+            <div className="mu" style={{ color: "#9FB" }}>
+              Strict-mode verified
+            </div>
           </div>
-          <button
-            className="btn ghost"
-            style={{ fontSize: "11px", padding: "4px 10px" }}
-            onClick={handleCopyStory}
-          >
-            Copy Story Text
-          </button>
+        </div>
+
+        {/* Instagram Clip */}
+        <div className="card">
+          <h2>Instagram clip</h2>
+          <div className="clip">
+            {state.calibrating
+              ? "CALIBRATING"
+              : `RANK ${tierInfo.full?.toUpperCase()}`}
+            <br />
+            <small>{state.streak || 0}-day streak</small>
+          </div>
+        </div>
+
+        {/* Level details collapsible */}
+        <div className="card">
+          <details>
+            <summary>
+              <b>Level details</b>
+            </summary>
+            {Object.keys(L).map((t) => {
+              const r = getTopicRating(t);
+              const base = [800, 1200, 1600][L[t] || 0];
+              const diff = r - base;
+              const spClass = diff >= 50 ? "g" : diff <= -50 ? "w" : "b";
+              return (
+                <div key={t} className="tr">
+                  <span>
+                    <i className={`sp ${spClass}`} />
+                    {t}
+                  </span>
+                  <b>{DIFFICULTY_LABELS[L[t] || 0]}</b>
+                </div>
+              );
+            })}
+            <div className="row" style={{ marginTop: "12px" }}>
+              <button
+                className="btn"
+                id="lvp2"
+                onClick={() => {
+                  setActiveModal("onboarding");
+                  setModalData({ step: 1 });
+                }}
+              >
+                Edit setup
+              </button>
+            </div>
+          </details>
         </div>
       </div>
     </div>

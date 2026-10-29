@@ -1,325 +1,208 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import { RANKING_CATEGORIES } from "../../data/rankingsData";
 import { getTierForRating } from "../../utils/tierUtils";
-import { rankingsApi } from "./rankingsApi";
+
+const PPL = [
+  ["Riya Verma", "👩‍💻", 1790, 48210, 132, 88],
+  ["Kabir Singh", "🧑‍🚀", 1690, 46950, 97, 74],
+  ["Ananya Gupta", "👩‍🎓", 1610, 44120, 61, 91],
+  ["Mohit Yadav", "🧔", 1540, 41300, 88, 52],
+  ["Sneha Rao", "👩‍🔬", 1470, 39870, 40, 67],
+  ["Dev Malhotra", "🧑‍🎤", 1390, 37010, 73, 80],
+  ["Isha Kapoor", "👩‍🚀", 1310, 33400, 29, 58],
+  ["Arjun Nair", "🧑‍💻", 1230, 30120, 51, 49],
+  ["Meera Joshi", "👩‍🏫", 1150, 26800, 18, 36],
+  ["Rahul Das", "🧑‍🔧", 1070, 22350, 36, 41],
+];
+
+const AVG = [
+  "linear-gradient(135deg,#5EA0FF,#B16BFF)",
+  "linear-gradient(135deg,#36D1C4,#5EA0FF)",
+  "linear-gradient(135deg,#FF8A3D,#FF4F7A)",
+];
+
+const SCOPES = [
+  "Global",
+  "India",
+  "State",
+  "College",
+  "Branch",
+  "Batch",
+  "Friends",
+];
 
 export function RankingsView() {
-  const { state } = useCalibr8();
-  const [activeBoard, setActiveBoard] = useState(state.board || "College");
-  const [rankings, setRankings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { state, setState } = useCalibr8();
+  const [scope, setScope] = useState(state.board || "College");
 
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchRankings() {
-      setLoading(true);
-      setError(null);
+  const myName =
+    state.name ||
+    (state.user && !state.user.guest
+      ? state.user.email?.split("@")[0]
+      : "You");
 
-      try {
-        const scopeParam =
-          activeBoard === "Global" || activeBoard === "All"
-            ? undefined
-            : activeBoard.toLowerCase();
+  const myAvatar = state.avatar || "🙂";
+  const myRating = state.rating || 1630;
+  const myScore = state.score || 16300;
+  const myStreak = state.streak || 46;
 
-        const params = {
-          scope: scopeParam,
-          limit: 50,
-        };
+  const rows = useMemo(() => {
+    const list = PPL.map(([n, f, r, s, st, sp]) => ({
+      name: n,
+      avatar: f,
+      rating: r,
+      score: s,
+      streak: st,
+      strictPct: `${sp}%`,
+      isMe: false,
+    }));
 
-        if (scopeParam === "college" && state.college) {
-          params.college = state.college;
-        } else if (scopeParam === "batch" && state.batch) {
-          params.batch = state.batch;
-        } else if (scopeParam === "state" && state.state) {
-          params.state = state.state;
-        } else if (scopeParam === "country" && state.country) {
-          params.country = state.country;
-        }
-
-        const res = await rankingsApi.getRankings(params);
-
-        if (isMounted) {
-          if (res?.data && Array.isArray(res.data)) {
-            const currentUserId = state.user?.id;
-            const currentUserName =
-              state.name ||
-              (state.user && !state.user.guest
-                ? state.user.email?.split("@")[0]
-                : null);
-
-            const mapped = res.data.map((u, i) => {
-              const isMe =
-                (currentUserId && u.id === currentUserId) ||
-                (currentUserName && u.name?.toLowerCase() === currentUserName.toLowerCase());
-
-              return {
-                id: u.id || `u-${i}`,
-                name: u.name || `Learner #${i + 1}`,
-                avatar: ["🙂", "😎", "🤓", "🧑‍💻", "👩‍💻", "🦊", "🐼", "🚀"][i % 8],
-                rating: u.rating || 1200,
-                score: u.score || 0,
-                streak: u.streak || 1,
-                strictPct: `${u.strictPercent || 90}%`,
-                college: u.college || "",
-                tier: u.tier || null,
-                isMe,
-              };
-            });
-
-            // If current user is logged in and not already in the list, insert their live position
-            if (currentUserName && !mapped.some((r) => r.isMe)) {
-              const myEntry = {
-                id: currentUserId || "me",
-                name: currentUserName,
-                avatar: state.avatar || "🙂",
-                rating: state.rating || 1200,
-                score: state.score || 0,
-                streak: state.streak || 1,
-                strictPct: "95%",
-                college: state.college || "",
-                tier: null,
-                isMe: true,
-              };
-              mapped.push(myEntry);
-              mapped.sort((a, b) => b.score - a.score);
-            }
-
-            setRankings(mapped);
-          } else {
-            setRankings([]);
-          }
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.warn("Could not fetch leaderboard from backend:", err.message);
-          setError("Failed to load rankings from backend server.");
-          setRankings([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchRankings();
-
-    return () => {
-      isMounted = false;
+    const me = {
+      name: myName,
+      avatar: myAvatar,
+      rating: myRating,
+      score: myScore,
+      streak: myStreak,
+      strictPct: "-",
+      isMe: true,
     };
-  }, [
-    activeBoard,
-    state.college,
-    state.batch,
-    state.state,
-    state.country,
-    state.user,
-    state.name,
-    state.rating,
-    state.score,
-    state.streak,
-    state.avatar,
-  ]);
 
-  // Podium (Top 3)
-  const pRank1 = rankings[0];
-  const pRank2 = rankings[1];
-  const pRank3 = rankings[2];
+    list.push(me);
+    list.sort((a, b) => b.score - a.score);
+    return list;
+  }, [myName, myAvatar, myRating, myScore, myStreak]);
 
-  const t1 = pRank1 ? getTierForRating(pRank1.rating) : null;
-  const t2 = pRank2 ? getTierForRating(pRank2.rating) : null;
-  const t3 = pRank3 ? getTierForRating(pRank3.rating) : null;
+  const myIndex = rows.findIndex((r) => r.isMe);
+
+  // Podium order: [rows[1], rows[0], rows[2]] => #2, #1, #3
+  const podiumOrder = [
+    { rank: 2, data: rows[1], medal: "🥈", className: "p2" },
+    { rank: 1, data: rows[0], medal: "👑", className: "p1" },
+    { rank: 3, data: rows[2], medal: "🥉", className: "p3" },
+  ];
+
+  const handleScopeChange = (e) => {
+    const val = e.target.value;
+    setScope(val);
+    setState((s) => ({ ...s, board: val }));
+  };
 
   return (
     <div>
-      <div style={{ marginBottom: "12px" }}>
-        <h1>Calibr8 Leaderboard</h1>
-        <p className="mu" style={{ margin: "4px 0" }}>
-          Live backend verified rankings. Rating shows raw skill calibration; score shows cumulative deliberate practice.
-        </p>
-      </div>
+      <h1>Rankings</h1>
 
       <div className="row">
-        {RANKING_CATEGORIES.map((category) => (
-          <button
-            key={category}
-            onClick={() => setActiveBoard(category)}
-            className={`pill ${activeBoard === category ? "on" : ""}`}
+        <label className="mu">
+          Show{" "}
+          <select
+            id="scp"
+            value={scope}
+            onChange={handleScopeChange}
+            aria-label="Ranking scope"
           >
-            {category}
-          </button>
-        ))}
+            {SCOPES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        {state.college && scope === "College" && (
+          <span className="tag">{state.college}</span>
+        )}
       </div>
 
-      {loading ? (
-        <div className="card" style={{ textAlign: "center", padding: "40px" }}>
-          <p className="mu">Fetching live rankings from backend...</p>
-        </div>
-      ) : error ? (
-        <div className="card" style={{ textAlign: "center", padding: "30px" }}>
-          <p className="bad">{error}</p>
-          <button
-            className="btn ghost"
-            style={{ marginTop: "10px" }}
-            onClick={() => setActiveBoard((b) => b)}
-          >
-            Retry Connection
-          </button>
-        </div>
-      ) : rankings.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", padding: "40px" }}>
-          <h3>No verified rankings found</h3>
-          <p className="mu" style={{ margin: "8px 0 14px" }}>
-            Be the first to rank on the {activeBoard} leaderboard by solving daily problems!
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* Top 3 Podium */}
-          {pRank1 && (
-            <div className="pod">
-              {/* Rank 2 - Silver */}
-              {pRank2 ? (
-                <div className="card">
-                  <div style={{ fontSize: "24px", marginBottom: "4px" }}>🥈</div>
-                  <div className="av" style={{ margin: "0 auto 8px" }}>
-                    {pRank2.avatar}
-                  </div>
-                  <h3 style={{ margin: "4px 0" }}>
-                    {pRank2.name} {pRank2.isMe && "(You)"}
-                  </h3>
-                  <span className="tbg" style={{ "--tc": t2.color, marginBottom: "4px" }}>
-                    {t2.full}
-                  </span>
-                  <div className="mu" style={{ fontSize: "12px", marginTop: "4px" }}>
-                    <b>{pRank2.score}</b> pts • {pRank2.rating} ELO
-                  </div>
-                  {pRank2.college && (
-                    <div className="mu" style={{ fontSize: "11px", marginTop: "2px" }}>
-                      {pRank2.college}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="card" style={{ opacity: 0.5 }}>
-                  <div style={{ fontSize: "24px", marginBottom: "4px" }}>🥈</div>
-                  <div className="mu">Rank #2 Open</div>
-                </div>
-              )}
+      {/* Podium 3-pillar layout */}
+      <div className="pod2">
+        {podiumOrder.map((item, idx) => {
+          const r = item.data;
+          if (!r) return null;
+          const tier = getTierForRating(r.rating);
+          const bgGrad = AVG[(r.name.length + idx) % 3];
 
-              {/* Rank 1 - Gold (Elevated) */}
-              <div className="card" style={{ paddingBottom: "24px" }}>
-                <div style={{ fontSize: "32px", marginBottom: "4px" }}>🥇</div>
-                <div className="av" style={{ margin: "0 auto 8px" }}>
-                  {pRank1.avatar}
-                </div>
-                <h3 style={{ margin: "4px 0" }}>
-                  {pRank1.name} {pRank1.isMe && "(You)"}
-                </h3>
-                <span className="tbg" style={{ "--tc": t1.color, marginBottom: "4px" }}>
-                  {t1.full}
-                </span>
-                <div className="mu" style={{ fontSize: "13px", marginTop: "4px" }}>
-                  <b>{pRank1.score}</b> pts • {pRank1.rating} ELO
-                </div>
-                {pRank1.college && (
-                  <div className="mu" style={{ fontSize: "11px", marginTop: "2px" }}>
-                    {pRank1.college}
-                  </div>
-                )}
-              </div>
-
-              {/* Rank 3 - Bronze */}
-              {pRank3 ? (
-                <div className="card">
-                  <div style={{ fontSize: "24px", marginBottom: "4px" }}>🥉</div>
-                  <div className="av" style={{ margin: "0 auto 8px" }}>
-                    {pRank3.avatar}
-                  </div>
-                  <h3 style={{ margin: "4px 0" }}>
-                    {pRank3.name} {pRank3.isMe && "(You)"}
-                  </h3>
-                  <span className="tbg" style={{ "--tc": t3.color, marginBottom: "4px" }}>
-                    {t3.full}
-                  </span>
-                  <div className="mu" style={{ fontSize: "12px", marginTop: "4px" }}>
-                    <b>{pRank3.score}</b> pts • {pRank3.rating} ELO
-                  </div>
-                  {pRank3.college && (
-                    <div className="mu" style={{ fontSize: "11px", marginTop: "2px" }}>
-                      {pRank3.college}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="card" style={{ opacity: 0.5 }}>
-                  <div style={{ fontSize: "24px", marginBottom: "4px" }}>🥉</div>
-                  <div className="mu">Rank #3 Open</div>
-                </div>
-              )}
+          return (
+            <div key={item.rank} className={`pc ${item.className}`}>
+              <div className="medal">{item.medal}</div>
+              <span className="av" style={{ background: bgGrad }}>
+                {r.avatar}
+              </span>
+              <h3>
+                {r.name}
+                {r.isMe ? " (you)" : ""}
+              </h3>
+              <span className="tbg" style={{ "--tc": tier.color }}>
+                {tier.full}
+              </span>
+              <p className="mu">{Math.floor(r.score).toLocaleString()} points</p>
+              <div className="stepb">{item.rank}</div>
             </div>
-          )}
+          );
+        })}
+      </div>
 
-          {/* Leaderboard Table */}
-          <div className="card">
-            <table>
-              <thead>
-                <tr>
-                  <th style={{ width: "50px" }}>Rank</th>
-                  <th>Learner</th>
-                  <th>Tier</th>
-                  <th>Rating</th>
-                  <th>Streak</th>
-                  <th>Strict</th>
-                  <th style={{ textAlign: "right" }}>Score</th>
+      {/* User relative ranking banner */}
+      <div className="card" style={{ margin: "12px 0" }}>
+        <b>You are #{myIndex + 1}.</b>{" "}
+        <span className="mu">
+          {myIndex > 0
+            ? `${Math.max(
+                1,
+                Math.ceil(rows[myIndex - 1].score - rows[myIndex].score)
+              ).toLocaleString()} points to pass ${rows[myIndex - 1].name}.`
+            : "You lead the board."}
+        </span>
+      </div>
+
+      {/* Full ranking table */}
+      <div className="card" style={{ overflowX: "auto" }}>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Learner</th>
+              <th>Tier</th>
+              <th>Rating</th>
+              <th>Score</th>
+              <th>Streak</th>
+              <th>Strict</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const tier = getTierForRating(r.rating);
+              const bgGrad = AVG[(r.name.length + i) % 3];
+
+              return (
+                <tr key={i} className={r.isMe ? "me" : ""}>
+                  <td>{i + 1}</td>
+                  <td>
+                    <span
+                      className="av sm"
+                      style={{ background: bgGrad, marginRight: "8px" }}
+                    >
+                      {r.avatar}
+                    </span>
+                    {r.name}
+                  </td>
+                  <td>
+                    <span className="tbg" style={{ "--tc": tier.color }}>
+                      {tier.full}
+                    </span>
+                  </td>
+                  <td>{r.rating}</td>
+                  <td>{Math.floor(r.score).toLocaleString()}</td>
+                  <td>🔥 {r.streak}</td>
+                  <td>{r.strictPct}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {rankings.map((row, idx) => {
-                  const tier = getTierForRating(row.rating);
-                  const rankNum = idx + 1;
-                  return (
-                    <tr key={row.id || idx} className={row.isMe ? "me" : ""}>
-                      <td className="mu">#{rankNum}</td>
-                      <td>
-                        <span className="av sm" style={{ marginRight: "8px" }}>
-                          {row.avatar}
-                        </span>
-                        <b>{row.name}</b>
-                        {row.isMe && (
-                          <span className="tag" style={{ marginLeft: "8px", fontSize: "10px" }}>
-                            You
-                          </span>
-                        )}
-                        {row.college && (
-                          <span className="mu" style={{ marginLeft: "6px", fontSize: "11px" }}>
-                            • {row.college}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <span className="tbg" style={{ "--tc": tier.color }}>
-                          {row.tier || tier.full}
-                        </span>
-                      </td>
-                      <td>
-                        <b>{row.rating}</b>
-                      </td>
-                      <td className="mu">🔥 {row.streak}d</td>
-                      <td className="mu">{row.strictPct}</td>
-                      <td style={{ textAlign: "right" }}>
-                        <b>{row.score}</b>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mu" style={{ marginTop: "12px" }}>
+        Sample data for everyone except you. Rating shows skill, score shows total work.
+      </p>
     </div>
   );
 }

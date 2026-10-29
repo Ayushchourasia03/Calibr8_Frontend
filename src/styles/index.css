@@ -3078,3 +3078,605 @@ body:has(.land)::before,
   background: #36435b;
   border-color: #64748b;
 }
+
+/* ===== CALIBR8 V7 UI STYLES ===== */
+
+/* Pinned problems row */
+.pinr {
+  cursor: pointer;
+}
+.pinr td {
+  background: rgba(255, 176, 32, 0.12) !important;
+}
+
+/* Podiums for Rankings */
+.pod2 {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  margin: 14px 0;
+}
+.pc {
+  flex: 1;
+  max-width: 250px;
+  text-align: center;
+  padding: 14px 10px 0;
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(180deg, rgba(124, 108, 240, 0.28), rgba(124, 108, 240, 0.06));
+  border: 1px solid var(--ln);
+  border-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pc.p1 {
+  min-height: 290px;
+  background: linear-gradient(180deg, rgba(255, 200, 60, 0.35), rgba(255, 200, 60, 0.06));
+}
+.pc.p2 {
+  min-height: 240px;
+}
+.pc.p3 {
+  min-height: 200px;
+}
+.pc .av {
+  width: 56px;
+  height: 56px;
+  font-size: 30px;
+}
+.pc.p1 .av {
+  width: 84px;
+  height: 84px;
+  font-size: 46px;
+  box-shadow: 0 0 24px rgba(255, 200, 60, 0.7);
+}
+.pc.p2 .av {
+  width: 68px;
+  height: 68px;
+  font-size: 36px;
+}
+.medal {
+  font-size: 26px;
+}
+.p1 .medal {
+  font-size: 36px;
+}
+.stepb {
+  margin-top: auto;
+  width: 100%;
+  padding: 8px 0;
+  font: 700 22px "Space Grotesk", system-ui, sans-serif;
+  background: var(--cf);
+  border-top: 1px solid var(--ln);
+}
+
+/* Profile Details & Form */
+.phead {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.pinfo {
+  flex: 1;
+  min-width: 200px;
+}
+.pf {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+.pf label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--mu);
+}
+.pf input,
+.pf select {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--ln);
+}
+
+/* Activity Heatmap & Month Bar */
+.hmw {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.ml {
+  display: grid;
+  grid-template-columns: repeat(53, 14px);
+  font-size: 11px;
+  color: var(--mu);
+  height: 16px;
+  width: max-content;
+}
+.hmw .heat {
+  grid-auto-columns: 11px;
+  width: max-content;
+  overflow: visible;
+}
+.rvt {
+  width: 100%;
+}
+
+/* Timeline Stages for Tracks */
+.tl {
+  margin: 10px 0;
+}
+.tls {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 14px;
+  position: relative;
+}
+.tls:not(:last-child):before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 34px;
+  bottom: 0;
+  width: 2px;
+  background: var(--ln);
+}
+.tn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #2F7BFF, #B16BFF);
+}
+
+/* Pulse Animation for Shield */
+.shpulse {
+  animation: shp 2s ease-in-out infinite;
+}
+@keyframes shp {
+  50% {
+    filter: drop-shadow(0 0 22px #FF4F7A) brightness(1.15);
+  }
+}
+
+/* Background Scene Decorations */
+#deco {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
+}
+#snd {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 25;
+  gap: 8px;
+  display: flex;
+}
+#snd button {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ln);
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+  font: 600 12px system-ui, sans-serif;
+  backdrop-filter: blur(12px);
+}
+
+/* Racer Decorations */
+.d-racer .road {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38px;
+  background: #1a1a1f;
+  border-top: 3px solid #FF1E1E;
+}
+.d-racer .road:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 17px;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, #fff 0 24px, transparent 24px 48px);
+  opacity: 0.7;
+}
+.d-racer .car {
+  position: absolute;
+  bottom: 6px;
+  font-size: 26px;
+  font-style: normal;
+  transform: scaleX(-1);
+  animation: drive 14s linear infinite;
+}
+.d-racer .c2 {
+  animation-duration: 9s;
+  animation-delay: -4s;
+  bottom: 2px;
+}
+.d-racer .c3 {
+  animation-duration: 19s;
+  animation-delay: -9s;
+  bottom: 8px;
+}
+@keyframes drive {
+  from {
+    left: -60px;
+  }
+  to {
+    left: 105%;
+  }
+}
+:root[data-skin="racer"] main {
+  margin-bottom: 56px;
+}
+
+/* Arcade Decorations */
+.d-arcade .star {
+  position: absolute;
+  color: #00FFC6;
+  animation: tw 2s infinite;
+}
+.d-arcade .s1 {
+  left: 8%;
+  top: 20%;
+}
+.d-arcade .s2 {
+  left: 60%;
+  top: 12%;
+}
+.d-arcade .s3 {
+  left: 92%;
+  top: 60%;
+}
+@keyframes tw {
+  50% {
+    opacity: 0.2;
+  }
+}
+.d-arcade .hud {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  font: 700 12px Orbitron, monospace;
+  color: #00FFC6;
+  padding: 4px 10px;
+  border: 2px solid #00FFC6;
+  background: #0B0620;
+}
+.d-arcade .hud b {
+  display: inline-block;
+  width: 80px;
+  height: 8px;
+  margin-left: 8px;
+  background: repeating-linear-gradient(90deg, #00FFC6 0 8px, transparent 8px 10px);
+  vertical-align: middle;
+}
+
+/* Anime Decorations */
+.d-anime .pet {
+  position: absolute;
+  top: -30px;
+  font-size: 20px;
+  animation: fall linear infinite;
+}
+@keyframes fall {
+  to {
+    transform: translate(60px, 110vh) rotate(360deg);
+  }
+}
+
+/* Comic Decorations */
+.d-comic .pow {
+  position: absolute;
+  right: 30px;
+  bottom: 30px;
+  font: 400 38px Bangers, Impact, sans-serif;
+  color: #E5232B;
+  transform: rotate(-10deg);
+  text-shadow: 3px 3px 0 #111, -1px -1px 0 #fff;
+  opacity: 0.85;
+}
+
+/* Storybook Decorations */
+.d-storybook .star {
+  position: absolute;
+  animation: tw 2.4s infinite;
+}
+.d-storybook .s1 {
+  left: 10%;
+  top: 18%;
+}
+.d-storybook .s2 {
+  left: 55%;
+  top: 10%;
+}
+.d-storybook .s3 {
+  left: 88%;
+  top: 34%;
+}
+.d-storybook .castle {
+  position: absolute;
+  right: 30px;
+  bottom: 6px;
+  font-size: 54px;
+  opacity: 0.9;
+}
+
+/* Anime Theme */
+:root[data-skin="anime"] {
+  --bg: #FFF4F8;
+  --card: #FFFFFF;
+  --fg: #1A1A1A;
+  --mu: #6B5A63;
+  --ln: #1A1A1A;
+  --ac: #FF4F8B;
+  --ac2: #4FC3FF;
+  --cf: rgba(255, 79, 139, 0.1);
+  --code: #FFF8FB;
+}
+:root[data-skin="anime"] body {
+  background: repeating-conic-gradient(from 0deg at 80% 10%, #FFE3EE 0 4deg, #FFF4F8 4deg 8deg);
+}
+:root[data-skin="anime"] :is(h1, h2, h3, .logo, .big, .word, .hero h1) {
+  font-family: Fredoka, "Segoe UI", sans-serif;
+  font-weight: 700;
+  background: none;
+  color: #1A1A1A;
+  -webkit-text-fill-color: #1A1A1A;
+  letter-spacing: 0;
+}
+:root[data-skin="anime"] :is(.card, header, #dock, .sheet, .stbtn, main) {
+  border: 3px solid #1A1A1A;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 5px 5px 0 #1A1A1A;
+}
+:root[data-skin="anime"] main {
+  background: rgba(255, 255, 255, 0.9);
+}
+:root[data-skin="anime"] :is(button.btn:not(.ghost), .chip.on, #dock button.on, nav button.on, .pill.on) {
+  background: #FF4F8B;
+  color: #fff;
+  border: 3px solid #1A1A1A;
+  border-radius: 14px;
+  box-shadow: 3px 3px 0 #1A1A1A;
+  font-weight: 700;
+}
+:root[data-skin="anime"] .bar {
+  border: 2px solid #1A1A1A;
+  height: 12px;
+}
+:root[data-skin="anime"] .bar i {
+  background: #FF4F8B !important;
+}
+
+/* Comic Theme */
+:root[data-skin="comic"] {
+  --bg: #FFF2A8;
+  --card: #fff;
+  --fg: #111;
+  --mu: #444;
+  --ln: #111;
+  --ac: #E5232B;
+  --ac2: #1F5FBF;
+  --cf: rgba(229, 35, 43, 0.1);
+  --code: #FFFDF0;
+}
+:root[data-skin="comic"] body {
+  background: radial-gradient(#E5232B 1.4px, transparent 1.5px) 0 0/14px 14px, #FFF2A8;
+}
+:root[data-skin="comic"] :is(h1, h2, h3, .logo, .big, .word, .hero h1) {
+  font-family: Bangers, Impact, sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: none;
+  color: #111;
+  -webkit-text-fill-color: #111;
+  text-shadow: 2px 2px 0 #fff;
+}
+:root[data-skin="comic"] :is(.card, header, #dock, .sheet, .stbtn) {
+  border: 3px solid #111;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 6px 6px 0 #111;
+}
+:root[data-skin="comic"] main {
+  border: 4px solid #111;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 8px 8px 0 #111;
+}
+:root[data-skin="comic"] :is(button.btn:not(.ghost), .chip.on, #dock button.on, nav button.on, .pill.on) {
+  background: #E5232B;
+  color: #fff;
+  border: 3px solid #111;
+  border-radius: 4px;
+  box-shadow: 4px 4px 0 #111;
+  font-family: Bangers, Impact, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 400;
+}
+:root[data-skin="comic"] .bar {
+  border: 2px solid #111;
+}
+:root[data-skin="comic"] .bar i {
+  background: #E5232B !important;
+}
+
+/* Storybook Theme */
+:root[data-skin="storybook"] {
+  --bg: #DCEBFF;
+  --card: #FFF8E7;
+  --fg: #3A2A12;
+  --mu: #7A6340;
+  --ln: #C9922E;
+  --ac: #C9922E;
+  --ac2: #7A5FD0;
+  --cf: rgba(201, 146, 46, 0.12);
+  --code: #FFFBEF;
+}
+:root[data-skin="storybook"] body {
+  background: linear-gradient(180deg, #BFD9FF, #F5E6FF 60%, #FFE9C9);
+}
+:root[data-skin="storybook"] :is(h1, h2, h3, .logo, .big, .word, .hero h1) {
+  font-family: Cinzel, Georgia, serif;
+  font-weight: 700;
+  background: none;
+  color: #8A5A12;
+  -webkit-text-fill-color: #8A5A12;
+  letter-spacing: 0.02em;
+}
+:root[data-skin="storybook"] :is(.card, header, #dock, .sheet, .stbtn) {
+  border: 2px solid #C9922E;
+  border-radius: 22px;
+  background: #FFF8E7;
+  box-shadow: 0 10px 24px -12px rgba(122, 95, 208, 0.5);
+}
+:root[data-skin="storybook"] main {
+  border: 2px solid #E3C078;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+}
+:root[data-skin="storybook"] :is(button.btn:not(.ghost), .chip.on, #dock button.on, nav button.on, .pill.on) {
+  background: linear-gradient(135deg, #E8B54A, #C9922E);
+  color: #3A2A12;
+  border: 1px solid #8A5A12;
+  border-radius: 999px;
+  box-shadow: 0 6px 14px -6px #8A5A12;
+  font-weight: 700;
+}
+:root[data-skin="storybook"] .bar i {
+  background: linear-gradient(90deg, #E8B54A, #7A5FD0) !important;
+}
+
+/* Account dropdown menu */
+#amenu {
+  position: fixed;
+  right: 14px;
+  top: 66px;
+  z-index: 30;
+  width: 250px;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--ln);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
+  color: var(--fg);
+}
+#amenu .mh {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 6px 10px;
+  border-bottom: 1px solid var(--ln);
+  margin-bottom: 6px;
+}
+#amenu button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 9px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13.5px;
+}
+#amenu button:hover {
+  background: var(--cf);
+}
+
+/* Enhanced Dock Nav matching image_bcb3493b.png */
+#dock {
+  position: fixed;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 7px;
+  border-radius: 38px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 20px 50px -15px rgba(100, 140, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  width: 76px;
+  align-items: center;
+}
+
+#dock button {
+  width: 62px;
+  height: 60px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+}
+
+#dock button span {
+  font-size: 24px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dock button em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4A5568;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  pointer-events: none;
+  transition: color 0.2s;
+}
+
+#dock button:hover:not(.on) {
+  background: rgba(66, 153, 225, 0.1);
+}
+
+#dock button.on {
+  background: linear-gradient(135deg, #3B82F6 0%, #6366F1 50%, #8B5CF6 100%);
+  border-radius: 22px;
+  box-shadow: 0 10px 24px -4px rgba(99, 102, 241, 0.65);
+}
+
+#dock button.on em {
+  color: #ffffff;
+  font-weight: 700;
+}

@@ -1,644 +1,464 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import { CURRICULUM } from "../../data/curriculumData";
-import { studyApi } from "./studyApi";
-
-const DEFAULT_SUBJECTS = [
-  { slug: "oops", name: "Object-Oriented Programming", icon: "🧩" },
-  { slug: "cn", name: "Computer Networks", icon: "🌐" },
-  { slug: "dbms", name: "Database Management Systems", icon: "🗄️" },
-  { slug: "os", name: "Operating Systems", icon: "⚙️" },
-  { slug: "system-design", name: "System Design", icon: "🏗️" },
-];
+import {
+  CURRICULUM,
+  STUDY_SHEETS,
+  QUESTION_BANKS,
+} from "../../data/curriculumData";
 
 export function LibraryView() {
-  const { state, setState, setActiveModal, setModalData, showToast } = useCalibr8();
+  const { state, setState, setActiveModal, setModalData } = useCalibr8();
 
-  const [subjects, setSubjects] = useState([]);
-  const [activeSubjectSlug, setActiveSubjectSlug] = useState("oops");
-  const [subjectData, setSubjectData] = useState(null);
-  const [chapterTopicsMap, setChapterTopicsMap] = useState({});
-  const [loadingSubject, setLoadingSubject] = useState(false);
+  const [activeCatIndex, setActiveCatIndex] = useState(state.libCat || 0);
 
-  // Active study topic lesson modal/reader state
-  const [activeLessonSlug, setActiveLessonSlug] = useState(null);
-  const [lessonData, setLessonData] = useState(null);
-  const [loadingLesson, setLoadingLesson] = useState(false);
-  const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [quizResults, setQuizResults] = useState(null);
-  const [submittingQuiz, setSubmittingQuiz] = useState(false);
+  // Daily question interaction state
+  const [dailySelected, setDailySelected] = useState(null);
 
-  // 1. Fetch available subjects from backend
-  useEffect(() => {
-    let active = true;
-    async function loadSubjects() {
-      try {
-        const res = await studyApi.getSubjects();
-        if (active && Array.isArray(res) && res.length > 0) {
-          const mapped = res.map((s) => ({
-            id: s.id,
-            slug: s.slug,
-            name: s.name,
-            icon:
-              s.slug === "cn"
-                ? "🌐"
-                : s.slug === "dbms"
-                  ? "🗄️"
-                  : s.slug === "oops"
-                    ? "🧩"
-                    : s.slug === "os"
-                      ? "⚙️"
-                      : "🏗️",
-            _count: s._count,
-          }));
-          setSubjects(mapped);
-          if (mapped[0]?.slug) {
-            setActiveSubjectSlug(mapped[0].slug);
-          }
-        } else {
-          setSubjects(DEFAULT_SUBJECTS);
-        }
-      } catch (err) {
-        console.warn("Could not fetch subjects, using defaults:", err.message);
-        setSubjects(DEFAULT_SUBJECTS);
-      }
-    }
-    loadSubjects();
-    return () => {
-      active = false;
-    };
-  }, []);
+  // Practice quiz modal state
+  const [activeQuiz, setActiveQuiz] = useState(null); // { title, list, currentIdx, score, selectedIdx, showExplanation }
 
-  // 2. Fetch subject chapters & topics from backend when subject changes
-  useEffect(() => {
-    let active = true;
-    async function loadSubjectDetails() {
-      if (!activeSubjectSlug) return;
-      setLoadingSubject(true);
+  // Study sheet modal state
+  const [studySheetModal, setStudySheetModal] = useState(null); // { topic, lessons, sheet }
 
-      try {
-        const res = await studyApi.getSubject(activeSubjectSlug);
-        if (active && res) {
-          setSubjectData(res);
+  const activeCategory =
+    CURRICULUM[Math.min(activeCatIndex, CURRICULUM.length - 1)];
+  const [categoryName, , topicGroups] = activeCategory;
 
-          // Fetch topics for each chapter
-          const chapters = res.chapters || [];
-          const topicMap = {};
-
-          await Promise.all(
-            chapters.map(async (chap) => {
-              try {
-                const topics = await studyApi.getChapterTopics(chap.id);
-                if (Array.isArray(topics)) {
-                  topicMap[chap.id] = topics;
-                }
-              } catch {
-                // If chapter topics API fails or empty, provide standard subtopics
-                topicMap[chap.id] = [
-                  { id: `${chap.id}-1`, slug: `${chap.slug}-foundations`, name: `${chap.name}: Foundations` },
-                  { id: `${chap.id}-2`, slug: `${chap.slug}-architecture`, name: `${chap.name}: Architecture & Mechanics` },
-                  { id: `${chap.id}-3`, slug: `${chap.slug}-interview`, name: `${chap.name}: Core Interview Problems` },
-                ];
-              }
-            })
-          );
-
-          if (active) {
-            setChapterTopicsMap(topicMap);
-          }
-        }
-      } catch (err) {
-        console.warn("Subject details fetch note:", err.message);
-        // Fallback to local curriculum data if backend study API is still initializing
-        const matched = CURRICULUM.find(
-          (c) =>
-            c[0].toLowerCase().includes(activeSubjectSlug) ||
-            (activeSubjectSlug === "cn" && c[0].includes("Networks")) ||
-            (activeSubjectSlug === "dbms" && c[0].includes("SQL")) ||
-            (activeSubjectSlug === "oops" && c[0].includes("CS")) ||
-            (activeSubjectSlug === "system-design" && c[0].includes("Design"))
-        );
-        if (matched) {
-          setSubjectData({
-            name: matched[0],
-            chapters: matched[2].map(([subName], idx) => ({
-              id: `chap-${idx}`,
-              slug: subName.toLowerCase().replace(/\s+/g, "-"),
-              name: subName,
-            })),
-          });
-          const localTopicMap = {};
-          matched[2].forEach(([subName, lessons], idx) => {
-            localTopicMap[`chap-${idx}`] = lessons.map((l, lIdx) => ({
-              id: `top-${idx}-${lIdx}`,
-              slug: `${subName.toLowerCase().replace(/\s+/g, "-")}-${l.toLowerCase().replace(/\s+/g, "-")}`,
-              name: l,
-            }));
-          });
-          setChapterTopicsMap(localTopicMap);
-        }
-      } finally {
-        if (active) {
-          setLoadingSubject(false);
-        }
-      }
-    }
-
-    loadSubjectDetails();
-
-    return () => {
-      active = false;
-    };
-  }, [activeSubjectSlug]);
-
-  // 3. Open study topic lesson modal / reader
-  const handleOpenTopic = async (topic) => {
-    setActiveLessonSlug(topic.slug);
-    setLoadingLesson(true);
-    setLessonData(null);
-    setSelectedAnswers({});
-    setQuizResults(null);
-
-    try {
-      const res = await studyApi.getTopicDetail(topic.slug);
-      if (res && (res.content || res.name)) {
-        setLessonData(res);
-      } else {
-        throw new Error("No remote lesson content");
-      }
-    } catch {
-      // Create rich study lesson fallback
-      setLessonData({
-        id: topic.id,
-        slug: topic.slug,
-        name: topic.name,
-        chapter: { name: subjectData?.name || "Core CS", subject: { name: activeSubjectSlug.toUpperCase() } },
-        content: `# ${topic.name}\n\n## 1. Executive Summary\n${topic.name} forms a core foundational pillar of computer science engineering interviews. Mastering the trade-offs, internal mechanics, and practical implementations is essential for high-performance software systems.\n\n## 2. Key Architecture & Principles\n- **Efficiency**: Constant-time metadata lookups and zero-copy buffers.\n- **Consistency**: ACID guarantees, idempotent state transitions, and thread-safe locks.\n- **Scalability**: Horizontal partitioning and cache-first access patterns.\n\n\`\`\`text\n[Client Request] --> [Load Balancer] --> [Application Layer] --> [Database Engine]\n                                     ↳ [In-Memory Cache (Redis)]\n\`\`\`\n\n## 3. Interview Takeaways\nAlways analyze worst-case time complexity, concurrency race conditions, and failover boundaries.`,
-        mcqs: [
-          {
-            id: "mcq-1",
-            question: `In modern engineering systems, what is the primary architectural trade-off associated with ${topic.name}?`,
-            options: [
-              "Balancing latency vs consistency guarantees",
-              "Disabling physical storage persistence",
-              "Converting asynchronous requests into blocking threads",
-              "Increasing memory footprint without bounds",
-            ],
-            difficulty: "Medium",
-          },
-          {
-            id: "mcq-2",
-            question: "Which invariant must always be preserved during optimal state transitions?",
-            options: [
-              "Data integrity and atomic commit boundaries",
-              "Random disk seeking",
-              "Uncontrolled connection pool allocation",
-              "Linear cache invalidation on every query",
-            ],
-            difficulty: "Easy",
-          },
-        ],
+  // Calculate total lessons and completed lessons across entire library
+  const { totalLessons, completedLessons } = useMemo(() => {
+    let total = 0;
+    CURRICULUM.forEach((cat) => {
+      cat[2].forEach((tg) => {
+        total += tg[1].length;
       });
-    } finally {
-      setLoadingLesson(false);
-    }
-  };
+    });
+    const done = Object.values(state.lib || {}).filter(Boolean).length;
+    return { totalLessons: total, completedLessons: done };
+  }, [state.lib]);
 
-  // 4. Submit MCQ quiz answers to BE (/api/study/topics/:topicSlug/submit)
-  const handleSubmitQuiz = async () => {
-    if (!lessonData?.mcqs || lessonData.mcqs.length === 0) return;
-    setSubmittingQuiz(true);
+  const [now] = useState(() => Date.now());
 
-    try {
-      const res = await studyApi.submitQuiz(lessonData.slug, selectedAnswers);
-      if (res?.results) {
-        setQuizResults(res);
-        showToast(`Quiz completed! Score: ${res.score}/${res.totalQuestions} (${res.percentage}%)`);
-        // Mark topic as completed
-        setState((s) => ({
-          ...s,
-          coins: s.coins + 25,
-          lib: { ...s.lib, [lessonData.slug]: true },
-        }));
-      } else {
-        throw new Error("No quiz results returned");
-      }
-    } catch {
-      // Local fallback evaluation
-      const results = lessonData.mcqs.map((q) => {
-        const userAns = selectedAnswers[q.id];
-        const correct = userAns === 0; // standard correct index
-        return {
-          mcqId: q.id,
-          correct,
-          userAnswer: userAns ?? -1,
-          correctIndex: 0,
-          explanation: "In distributed and core CS architectures, latency vs consistency is the primary tradeoff according to the CAP theorem.",
-        };
-      });
-      const passedCount = results.filter((r) => r.correct).length;
-      const pct = Math.round((passedCount / results.length) * 100);
+  // Question bank for current category (e.g., Aptitude, English)
+  const categoryBank = useMemo(() => {
+    return QUESTION_BANKS.filter((q) => q[0] === categoryName);
+  }, [categoryName]);
 
-      setQuizResults({
-        success: true,
-        totalQuestions: results.length,
-        score: passedCount,
-        percentage: pct,
-        results,
-      });
+  // Daily question from bank based on current date
+  const dailyQuestion = useMemo(() => {
+    if (!categoryBank.length) return null;
+    const dayIndex = Math.floor(now / 864e5) % categoryBank.length;
+    return categoryBank[dayIndex];
+  }, [categoryBank, now]);
 
-      setState((s) => ({
-        ...s,
-        coins: s.coins + 20,
-        lib: { ...s.lib, [lessonData.slug]: true },
-      }));
-      showToast(`Quiz Evaluated! Score: ${passedCount}/${results.length}`);
-    } finally {
-      setSubmittingQuiz(false);
-    }
-  };
-
-  const handleLessonToggle = (topicSlug) => {
+  // Toggle lesson checkbox
+  const handleLessonToggle = (catName, topicName, lessonName) => {
+    const key = `${catName}|${topicName}|${lessonName}`;
+    const currentVal = !!(state.lib || {})[key];
     setState((s) => ({
       ...s,
-      lib: { ...s.lib, [topicSlug]: !s.lib?.[topicSlug] },
+      lib: {
+        ...(s.lib || {}),
+        [key]: currentVal ? 0 : 1,
+      },
     }));
   };
 
-  const completedCount = Object.values(state.lib || {}).filter(Boolean).length;
+  // Open study sheet modal
+  const openStudySheet = (topicName, lessons) => {
+    const sheet =
+      STUDY_SHEETS[topicName] || ["Notes for this topic are coming soon."];
+    setStudySheetModal({
+      topic: topicName,
+      lessons,
+      sheet,
+    });
+  };
+
+  // Open video modal
+  const openVideo = (topicName) => {
+    setActiveModal("video");
+    setModalData({ topic: topicName });
+  };
+
+  // Start practice quiz
+  const startQuiz = (list, title) => {
+    setActiveQuiz({
+      title,
+      list,
+      currentIdx: 0,
+      score: 0,
+      selectedIdx: null,
+      showExplanation: false,
+    });
+  };
+
+  // Handle quiz option selection
+  const handleQuizAnswer = (optionIdx) => {
+    if (!activeQuiz || activeQuiz.showExplanation) return;
+    const currentQ = activeQuiz.list[activeQuiz.currentIdx];
+    const isCorrect = optionIdx === currentQ[3];
+
+    setActiveQuiz((prev) => ({
+      ...prev,
+      selectedIdx: optionIdx,
+      showExplanation: true,
+      score: isCorrect ? prev.score + 1 : prev.score,
+    }));
+  };
+
+  // Advance or finish quiz
+  const handleNextQuizQuestion = () => {
+    if (!activeQuiz) return;
+    setActiveQuiz((prev) => ({
+      ...prev,
+      currentIdx: prev.currentIdx + 1,
+      selectedIdx: null,
+      showExplanation: false,
+    }));
+  };
 
   return (
     <div>
-      <div style={{ marginBottom: "14px" }}>
-        <h1>Curriculum Library</h1>
-        <p className="mu" style={{ margin: "4px 0" }}>
-          Full-stack study material and concept walkthroughs for <b>OOPS, Computer Networks, DBMS, OS, and System Design</b>. Fetched live from the backend study engine.
-        </p>
+      <h1>Library</h1>
+      <p className="mu">
+        Every topic from the basics of DSA to core CS, aptitude, English, data
+        analytics, system design and AI in practice. Open a study sheet, tick
+        lessons as you finish them, and practise with the question banks.{" "}
+        {completedLessons} of {totalLessons} lessons done.
+      </p>
+
+      {/* Category Navigation Pills */}
+      <div className="row">
+        {CURRICULUM.map((cat, i) => (
+          <button
+            key={cat[0]}
+            className={`pill ${i === activeCatIndex ? "on" : ""}`}
+            data-c={i}
+            onClick={() => {
+              setActiveCatIndex(i);
+              setDailySelected(null);
+            }}
+          >
+            {cat[1]} {cat[0]}
+          </button>
+        ))}
       </div>
 
-      {/* Subject Selector Pills */}
-      <div className="row" style={{ marginBottom: "16px", flexWrap: "wrap", gap: "6px" }}>
-        {subjects.map((sub) => {
-          const isSelected = sub.slug === activeSubjectSlug;
-          return (
+      {/* Daily Question & Question Bank for categories with banks */}
+      {dailyQuestion && (
+        <div className="grid" style={{ marginBottom: "14px" }}>
+          <div className="card">
+            <h2>Daily {categoryName.toLowerCase()} question</h2>
+            <p>
+              <b>{dailyQuestion[1]}</b>
+            </p>
+            <div id="dqo">
+              {dailyQuestion[2].map((option, j) => {
+                const isSelected = dailySelected === j;
+                const isCorrect = j === dailyQuestion[3];
+                let borderColor = "";
+                if (dailySelected !== null) {
+                  borderColor = isCorrect
+                    ? "#2ED47A"
+                    : isSelected
+                    ? "#FF5C7A"
+                    : "";
+                }
+
+                return (
+                  <button
+                    key={j}
+                    className="btn ghost dqb"
+                    data-j={j}
+                    disabled={dailySelected !== null}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      margin: "5px 0",
+                      borderColor: borderColor || undefined,
+                    }}
+                    onClick={() => {
+                      setDailySelected(j);
+                      setState((s) => ({
+                        ...s,
+                        libDay: {
+                          ...(s.libDay || {}),
+                          [categoryName]: new Date().toISOString().slice(0, 10),
+                        },
+                      }));
+                    }}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+
+            {dailySelected !== null && (
+              <div id="dqe">
+                <p className={dailySelected === dailyQuestion[3] ? "ok" : ""}>
+                  <b>
+                    {dailySelected === dailyQuestion[3]
+                      ? "Correct."
+                      : "Not quite."}
+                  </b>{" "}
+                  {dailyQuestion[4]}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <h2>{categoryName} question bank</h2>
+            <p className="mu">
+              {categoryBank.length} questions with explanations. You see the
+              answer and the reasoning right after each one.
+            </p>
             <button
-              key={sub.slug}
-              onClick={() => setActiveSubjectSlug(sub.slug)}
-              className={`pill ${isSelected ? "on" : ""}`}
-              style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px" }}
+              className="btn"
+              id="qbank"
+              onClick={() =>
+                startQuiz(categoryBank, `${categoryName} question bank`)
+              }
             >
-              <span>{sub.icon}</span>
-              <span>{sub.name}</span>
+              Start practice quiz
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Topics Grid */}
+      <div className="grid lib">
+        {topicGroups.map(([topicName, lessons]) => {
+          const completedInTopic = lessons.filter(
+            (l) => (state.lib || {})[`${categoryName}|${topicName}|${l}`]
+          ).length;
+          const pct = lessons.length
+            ? (completedInTopic / lessons.length) * 100
+            : 0;
+
+          return (
+            <div key={topicName} className="card">
+              <h3>{topicName}</h3>
+              <div className="bar">
+                <i style={{ width: `${pct}%` }}></i>
+              </div>
+              <p className="mu lc">
+                {completedInTopic} of {lessons.length} lessons
+              </p>
+
+              <details>
+                <summary>Lessons</summary>
+                {lessons.map((lesson) => {
+                  const isChecked =
+                    !!(state.lib || {})[
+                      `${categoryName}|${topicName}|${lesson}`
+                    ];
+                  return (
+                    <label
+                      key={lesson}
+                      className="tr"
+                      style={{ cursor: "pointer" }}
+                    >
+                      <span>{lesson}</span>
+                      <input
+                        type="checkbox"
+                        className="lk"
+                        checked={isChecked}
+                        onChange={() =>
+                          handleLessonToggle(
+                            categoryName,
+                            topicName,
+                            lesson
+                          )
+                        }
+                      />
+                    </label>
+                  );
+                })}
+              </details>
+
+              <div className="row">
+                <button
+                  className="btn ghost shb"
+                  data-t={topicName}
+                  data-c={activeCatIndex}
+                  onClick={() => openStudySheet(topicName, lessons)}
+                >
+                  📄 Study sheet
+                </button>
+                <button
+                  className="btn ghost vid2"
+                  data-t={topicName}
+                  onClick={() => openVideo(topicName)}
+                >
+                  🎬 Video{state.videos?.[topicName] ? " ✓" : ""}
+                </button>
+              </div>
+            </div>
           );
         })}
       </div>
 
-      {/* Subject Progress Summary */}
-      <div
-        className="card"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "10px",
-          marginBottom: "16px",
-          padding: "12px 18px",
-        }}
-      >
-        <div>
-          <b style={{ fontSize: "16px" }}>
-            {subjectData?.name || activeSubjectSlug.toUpperCase()}
-          </b>
-          <p className="mu" style={{ margin: "2px 0 0", fontSize: "13px" }}>
-            {subjectData?.chapters?.length || 0} chapters • Study notes, mathematical models, and verified MCQ evaluations
-          </p>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <span className="ok" style={{ fontWeight: "bold" }}>
-            {completedCount} Lessons Completed
-          </span>
-          <div className="mu" style={{ fontSize: "11px" }}>+25 Coins per quiz</div>
-        </div>
-      </div>
-
-      {/* Chapters & Topics Grid */}
-      {loadingSubject ? (
-        <div className="card" style={{ textAlign: "center", padding: "40px" }}>
-          <p className="mu">Fetching curriculum chapters and study topics from backend...</p>
-        </div>
-      ) : !subjectData?.chapters?.length ? (
-        <div className="card" style={{ textAlign: "center", padding: "30px" }}>
-          <p className="mu">No chapters found for this subject.</p>
-        </div>
-      ) : (
-        <div className="grid lib">
-          {subjectData.chapters.map((chap) => {
-            const chapTopics = chapterTopicsMap[chap.id] || [];
-            const completedInChap = chapTopics.filter((t) => state.lib?.[t.slug]).length;
-            const percentage = chapTopics.length
-              ? Math.round((completedInChap / chapTopics.length) * 100)
-              : 0;
-
-            return (
-              <div key={chap.id} className="card">
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
-                    marginBottom: "6px",
-                  }}
-                >
-                  <h3 style={{ margin: 0, fontSize: "15px" }}>{chap.name}</h3>
-                  <span className="mu" style={{ fontSize: "11px" }}>
-                    {completedInChap}/{chapTopics.length}
-                  </span>
-                </div>
-
-                <div className="bar" style={{ margin: "6px 0 12px" }}>
-                  <i style={{ width: `${percentage}%` }} />
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                    maxHeight: "220px",
-                    overflowY: "auto",
-                    paddingRight: "4px",
-                  }}
-                >
-                  {chapTopics.map((topic) => {
-                    const isChecked = !!state.lib?.[topic.slug];
-                    return (
-                      <div
-                        key={topic.id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "6px 8px",
-                          background: "var(--cf)",
-                          borderRadius: "8px",
-                          border: "1px solid var(--ln)",
-                          gap: "8px",
-                        }}
-                      >
-                        <label
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            fontSize: "12px",
-                            cursor: "pointer",
-                            flex: 1,
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleLessonToggle(topic.slug)}
-                          />
-                          <span
-                            style={{
-                              textDecoration: isChecked ? "line-through" : "none",
-                              opacity: isChecked ? 0.7 : 1,
-                            }}
-                          >
-                            {topic.name}
-                          </span>
-                        </label>
-                        <button
-                          className="btn ghost"
-                          style={{ fontSize: "10px", padding: "2px 8px", whiteSpace: "nowrap" }}
-                          onClick={() => handleOpenTopic(topic)}
-                        >
-                          Study & Quiz 📖
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div style={{ marginTop: "12px", display: "flex", gap: "6px" }}>
+      {/* Practice Quiz Modal */}
+      {activeQuiz && (
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target.classList.contains("modal")) setActiveQuiz(null);
+          }}
+        >
+          <div className="sheet">
+            <button
+              className="x"
+              aria-label="Close"
+              onClick={() => setActiveQuiz(null)}
+            >
+              &times;
+            </button>
+            <h2>{activeQuiz.title}</h2>
+            <div id="qz">
+              {activeQuiz.currentIdx >= activeQuiz.list.length ? (
+                <div>
+                  <p className="big" style={{ fontSize: "36px" }}>
+                    {activeQuiz.score} / {activeQuiz.list.length}
+                  </p>
+                  <p className="mu">
+                    {activeQuiz.score >= activeQuiz.list.length * 0.8
+                      ? "Excellent work."
+                      : activeQuiz.score >= activeQuiz.list.length * 0.5
+                      ? "Good. Read the explanations and try again."
+                      : "Keep practising. Read the study sheet and retry."}
+                  </p>
                   <button
-                    className="btn ghost"
-                    style={{ flex: 1, fontSize: "11px", padding: "5px" }}
-                    onClick={() => {
-                      setActiveModal("video");
-                      setModalData({ topic: chap.name });
-                    }}
+                    className="btn"
+                    id="qa"
+                    onClick={() =>
+                      setActiveQuiz((prev) => ({
+                        ...prev,
+                        currentIdx: 0,
+                        score: 0,
+                        selectedIdx: null,
+                        showExplanation: false,
+                      }))
+                    }
                   >
-                    ▶ Video Walkthrough
+                    Try again
                   </button>
                 </div>
-              </div>
-            );
-          })}
+              ) : (
+                (() => {
+                  const q = activeQuiz.list[activeQuiz.currentIdx];
+                  return (
+                    <div>
+                      <p className="mu">
+                        Question {activeQuiz.currentIdx + 1} of{" "}
+                        {activeQuiz.list.length}
+                      </p>
+                      <p>
+                        <b>{q[1]}</b>
+                      </p>
+                      {q[2].map((option, j) => {
+                        let borderColor = "";
+                        if (activeQuiz.showExplanation) {
+                          borderColor =
+                            j === q[3]
+                              ? "#2ED47A"
+                              : j === activeQuiz.selectedIdx
+                              ? "#FF5C7A"
+                              : "";
+                        }
+                        return (
+                          <button
+                            key={j}
+                            className="btn ghost qo"
+                            data-j={j}
+                            disabled={activeQuiz.showExplanation}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              textAlign: "left",
+                              margin: "6px 0",
+                              borderColor: borderColor || undefined,
+                            }}
+                            onClick={() => handleQuizAnswer(j)}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
+                      {activeQuiz.showExplanation && (
+                        <div id="qe">
+                          <p
+                            className={
+                              activeQuiz.selectedIdx === q[3] ? "ok" : ""
+                            }
+                          >
+                            <b>
+                              {activeQuiz.selectedIdx === q[3]
+                                ? "Correct."
+                                : "Not quite."}
+                            </b>{" "}
+                            {q[4]}
+                          </p>
+                          <button
+                            className="btn"
+                            id="qn"
+                            onClick={handleNextQuizQuestion}
+                          >
+                            {activeQuiz.currentIdx + 1 < activeQuiz.list.length
+                              ? "Next"
+                              : "Finish"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Study Material Reader & Quiz Modal */}
-      {activeLessonSlug && (
-        <div className="modal" onClick={() => setActiveLessonSlug(null)}>
-          <div
-            className="sheet"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "780px", width: "95%", maxHeight: "90vh", overflowY: "auto" }}
-          >
-            <button className="x" onClick={() => setActiveLessonSlug(null)}>
-              ×
+      {/* Study Sheet Modal */}
+      {studySheetModal && (
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target.classList.contains("modal")) setStudySheetModal(null);
+          }}
+        >
+          <div className="sheet">
+            <button
+              className="x"
+              aria-label="Close"
+              onClick={() => setStudySheetModal(null)}
+            >
+              &times;
             </button>
-
-            {loadingLesson ? (
-              <div style={{ textAlign: "center", padding: "40px" }}>
-                <p className="mu">Fetching study material & interactive quiz from backend...</p>
-              </div>
-            ) : lessonData ? (
-              <div>
-                <div style={{ display: "flex", gap: "6px", alignItems: "center", fontSize: "12px", color: "var(--mu)", marginBottom: "4px" }}>
-                  <span>{lessonData.chapter?.subject?.name || activeSubjectSlug.toUpperCase()}</span>
-                  <span>›</span>
-                  <span>{lessonData.chapter?.name || "Chapter"}</span>
-                </div>
-                <h2>{lessonData.name}</h2>
-
-                {/* Lesson Study Content */}
-                <div
-                  style={{
-                    margin: "14px 0",
-                    padding: "16px",
-                    background: "var(--code)",
-                    borderRadius: "14px",
-                    border: "1px solid var(--ln)",
-                    lineHeight: "1.7",
-                    fontSize: "13.5px",
-                    color: "var(--fg)",
-                    whiteSpace: "pre-wrap",
-                    fontFamily: "system-ui, sans-serif",
-                  }}
-                >
-                  {lessonData.content}
-                </div>
-
-                {/* Interactive Practice Quiz Section */}
-                {lessonData.mcqs && lessonData.mcqs.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: "20px",
-                      padding: "16px",
-                      background: "var(--cf)",
-                      borderRadius: "14px",
-                      border: "1px solid var(--ln)",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                      <h3>Interactive Knowledge Evaluation</h3>
-                      <span className="tag" style={{ background: "rgba(47, 139, 255, 0.2)", color: "var(--ac2)" }}>
-                        {lessonData.mcqs.length} Questions
-                      </span>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                      {lessonData.mcqs.map((mcq, idx) => {
-                        const evalResult = quizResults?.results?.find((r) => r.mcqId === mcq.id);
-                        const isCorrect = evalResult?.correct;
-
-                        return (
-                          <div
-                            key={mcq.id}
-                            style={{
-                              padding: "12px",
-                              background: "rgba(0, 0, 0, 0.3)",
-                              borderRadius: "10px",
-                              border: evalResult
-                                ? isCorrect
-                                  ? "1px solid #2ED47A"
-                                  : "1px solid #FF5C7A"
-                                : "1px solid var(--ln)",
-                            }}
-                          >
-                            <b style={{ fontSize: "13px" }}>
-                              {idx + 1}. {mcq.question}
-                            </b>
-
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px" }}>
-                              {mcq.options.map((opt, optIdx) => {
-                                const isSelected = selectedAnswers[mcq.id] === optIdx;
-                                const isTheCorrectOne = evalResult?.correctIndex === optIdx;
-
-                                let optionStyle = {
-                                  padding: "8px 12px",
-                                  borderRadius: "6px",
-                                  fontSize: "12px",
-                                  cursor: "pointer",
-                                  border: "1px solid var(--ln)",
-                                  background: isSelected ? "rgba(47, 139, 255, 0.3)" : "transparent",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                };
-
-                                if (evalResult) {
-                                  if (isTheCorrectOne) {
-                                    optionStyle.border = "1px solid #2ED47A";
-                                    optionStyle.background = "rgba(46, 212, 122, 0.2)";
-                                  } else if (isSelected && !isCorrect) {
-                                    optionStyle.border = "1px solid #FF5C7A";
-                                    optionStyle.background = "rgba(255, 92, 122, 0.2)";
-                                  }
-                                }
-
-                                return (
-                                  <label key={optIdx} style={optionStyle}>
-                                    <input
-                                      type="radio"
-                                      name={mcq.id}
-                                      disabled={!!quizResults}
-                                      checked={isSelected}
-                                      onChange={() =>
-                                        setSelectedAnswers((prev) => ({
-                                          ...prev,
-                                          [mcq.id]: optIdx,
-                                        }))
-                                      }
-                                    />
-                                    <span>{opt}</span>
-                                    {evalResult && isTheCorrectOne && (
-                                      <span className="ok" style={{ marginLeft: "auto", fontSize: "11px" }}>
-                                        ✓ Correct
-                                      </span>
-                                    )}
-                                  </label>
-                                );
-                              })}
-                            </div>
-
-                            {evalResult && evalResult.explanation && (
-                              <div
-                                style={{
-                                  marginTop: "8px",
-                                  padding: "8px",
-                                  background: "rgba(255, 255, 255, 0.05)",
-                                  borderRadius: "6px",
-                                  fontSize: "11.5px",
-                                  color: "var(--mu)",
-                                }}
-                              >
-                                💡 <b>Explanation:</b> {evalResult.explanation}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {quizResults ? (
-                      <div
-                        style={{
-                          marginTop: "16px",
-                          padding: "12px",
-                          borderRadius: "10px",
-                          background:
-                            quizResults.percentage >= 70
-                              ? "rgba(46, 212, 122, 0.15)"
-                              : "rgba(255, 92, 122, 0.15)",
-                          textAlign: "center",
-                        }}
-                      >
-                        <b>
-                          Evaluation Result: {quizResults.score} / {quizResults.totalQuestions} ({quizResults.percentage}%)
-                        </b>
-                        <p className="mu" style={{ margin: "4px 0 0", fontSize: "12px" }}>
-                          {quizResults.percentage >= 70
-                            ? "Excellent mastery! +25 Coins awarded."
-                            : "Review the explanations above and try again."}
-                        </p>
-                      </div>
-                    ) : (
-                      <button
-                        className="btn"
-                        style={{ marginTop: "14px", width: "100%" }}
-                        disabled={
-                          submittingQuiz ||
-                          Object.keys(selectedAnswers).length < lessonData.mcqs.length
-                        }
-                        onClick={handleSubmitQuiz}
-                      >
-                        {submittingQuiz
-                          ? "Evaluating with Backend..."
-                          : `Submit Answers (${Object.keys(selectedAnswers).length}/${lessonData.mcqs.length} answered)`}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="mu">No lesson details available.</p>
-            )}
+            <h2>{studySheetModal.topic}: study sheet</h2>
+            <p className="mu">Key points to remember.</p>
+            <ul className="shl">
+              {studySheetModal.sheet.map((x, idx) => (
+                <li key={idx}>{x}</li>
+              ))}
+            </ul>
+            <h3>Lessons in this topic</h3>
+            <ul className="shl">
+              {studySheetModal.lessons.map((lesson, idx) => (
+                <li key={idx}>{lesson}</li>
+              ))}
+            </ul>
+            <p className="mu">
+              Tip: when Calibr8 is open in its own tab, your browser&apos;s print
+              option can save this page as a PDF.
+            </p>
           </div>
         </div>
       )}
