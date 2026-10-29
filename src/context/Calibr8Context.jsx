@@ -16,19 +16,38 @@ import { api, tokenStorage } from "../services/api";
 
 const STORAGE_KEY = "calibr8-v1";
 
+const VIEW_PATHS = {
+  landing: "/welcome",
+  home: "/",
+  solve: "/solve",
+  problems: "/problems",
+  library: "/library",
+  tracks: "/tracks",
+  board: "/rankings",
+  me: "/profile",
+  store: "/store",
+};
+const PATH_VIEWS = Object.fromEntries(
+  Object.entries(VIEW_PATHS).map(([view, path]) => [path, view]),
+);
+
+function viewFromPath(pathname) {
+  return PATH_VIEWS[pathname.replace(/\/+$/, "") || "/"] || "home";
+}
+
 export const Calibr8Context = createContext(null);
 
 export function Calibr8Provider({ children }) {
   const [state, setState] = useState(() => {
     const today = Math.floor(Date.now() / 864e5);
+    const hasAuthToken = Boolean(tokenStorage.get());
     const initial = {
-      view: "landing",
+      view: hasAuthToken ? viewFromPath(window.location.pathname) : "landing",
       coins: 340,
       score: 1630,
       rating: 1630,
       streak: 46,
       calibrating: false,
-      freeDry: 3,
       theme: "default",
       skin: "default",
       ownedSkins: ["default"],
@@ -57,7 +76,8 @@ export function Calibr8Provider({ children }) {
       revise: [],
       dayStamp: today,
       started: false,
-      mode: "dark",
+      mode: "light",
+      modePreferenceSet: false,
       lang: "Python3",
       user: null,
       notes: {},
@@ -87,7 +107,16 @@ export function Calibr8Provider({ children }) {
           parsed.stretch = null;
           parsed.stretchN = 0;
         }
-        return { ...initial, ...parsed };
+        return {
+          ...initial,
+          ...parsed,
+          view:
+            hasAuthToken || parsed.user?.guest
+              ? viewFromPath(window.location.pathname)
+              : "landing",
+          user: hasAuthToken || parsed.user?.guest ? parsed.user : null,
+          mode: parsed.modePreferenceSet ? parsed.mode : "light",
+        };
       }
     } catch {
       // ignore
@@ -119,6 +148,33 @@ export function Calibr8Provider({ children }) {
     }, 3200);
   }, []);
 
+  useEffect(() => {
+    const path = VIEW_PATHS[state.view] || "/";
+    if (window.location.pathname !== path) {
+      window.history.replaceState({}, "", path);
+    }
+  }, [state.view]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const view = viewFromPath(window.location.pathname);
+      if (!tokenStorage.get() && !state.user?.guest && view !== "landing") {
+        window.history.replaceState({}, "", VIEW_PATHS.landing);
+        setState((current) => ({ ...current, view: "landing", user: null }));
+        return;
+      }
+      if (state.att?.mode === "strict" && state.att?.active) {
+        showToast("Finish or abandon the strict attempt first.");
+        window.history.replaceState({}, "", VIEW_PATHS[state.view] || "/");
+        return;
+      }
+      setState((current) => ({ ...current, view }));
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [showToast, state.att, state.user?.guest, state.view]);
+
   // Sync skin and theme attributes to HTML root
   useEffect(() => {
     const currentSkin = previewSkinId || state.skin || "default";
@@ -127,7 +183,7 @@ export function Calibr8Provider({ children }) {
     if (skinDef?.themeMode) {
       document.documentElement.dataset.theme = skinDef.themeMode;
     } else {
-      document.documentElement.dataset.theme = state.mode || "dark";
+      document.documentElement.dataset.theme = state.mode || "light";
     }
   }, [state.skin, state.mode, previewSkinId]);
 
@@ -214,6 +270,9 @@ export function Calibr8Provider({ children }) {
       } catch (authErr) {
         console.warn("Session expired or invalid:", authErr.message);
         tokenStorage.remove();
+        if (isMounted) {
+          setState((s) => ({ ...s, user: null, view: "landing" }));
+        }
       }
     }
 
@@ -277,8 +336,17 @@ export function Calibr8Provider({ children }) {
       showToast("Finish or abandon the strict attempt first.");
       return;
     }
+    if (!tokenStorage.get() && !state.user?.guest && view !== "landing") {
+      showToast("Please log in to continue.");
+      setState((s) => ({ ...s, view: "landing", user: null }));
+      return;
+    }
     if (previewSkinId && view !== "store") {
       setPreviewSkinId(null);
+    }
+    const path = VIEW_PATHS[view] || "/";
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, "", path);
     }
     setState((s) => ({ ...s, view }));
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -333,6 +401,7 @@ export function Calibr8Provider({ children }) {
     setState((s) => ({
       ...s,
       mode: s.mode === "light" ? "dark" : "light",
+      modePreferenceSet: true,
     }));
   };
 
@@ -495,6 +564,7 @@ export function Calibr8Provider({ children }) {
       setState((s) => ({
         ...s,
         user: null,
+        view: "landing",
       }));
     }
   };
@@ -601,7 +671,7 @@ export function Calibr8Provider({ children }) {
       ratings: easyRatings,
       lang: s.lang || "Python3",
       user: s.user || {
-        guest: false,
+        guest: true,
         name: "Demo Learner",
         email: "demo@calibr8.local",
         difficulty: "easy",

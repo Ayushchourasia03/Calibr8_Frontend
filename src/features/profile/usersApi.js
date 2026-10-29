@@ -14,6 +14,14 @@ export const usersApi = {
   },
 
   /**
+   * Get daily fully accepted submission counts for the authenticated user.
+   * GET /api/users/me/activity
+   */
+  getActivity: async () => {
+    return await request("/users/me/activity", { method: "GET" });
+  },
+
+  /**
    * Update user display name.
    * PUT /api/users/me (Protected: Bearer <token>)
    */

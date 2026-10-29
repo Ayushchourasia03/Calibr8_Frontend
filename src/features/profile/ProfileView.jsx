@@ -1,113 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import { ymd, ShieldBadge } from "../../utils/tierUtils";
+import { ShieldBadge } from "../../utils/tierUtils";
 import { DIFFICULTY_LABELS } from "../../data/constants";
+import { usersApi } from "./usersApi";
+import { tokenStorage } from "../../services/apiClient";
+import { ConnectedAccounts } from "./ConnectedAccounts";
 
 const AVATARS = [
   "🙂", "😎", "🤓", "🧑‍💻", "👩‍💻", "🧑‍🚀", "🦊", "🐼", "🚀", "🎮",
 ];
-
-const DEGREES = ["B.Tech", "B.E.", "BCA", "B.Sc", "M.Tech", "MCA", "Other"];
-const BRANCHES = [
-  "Computer Science",
-  "Information Technology",
-  "Electronics and Communication",
-  "Electrical",
-  "Mechanical",
-  "Civil",
-  "AI and ML",
-  "Data Science",
-  "Other",
-];
-const YEARS = [2026, 2027, 2028, 2029, 2030, 2031];
-
-const COLLEGES = {
-  "Uttar Pradesh": [
-    "IIT Kanpur",
-    "IIT (BHU) Varanasi",
-    "IIIT Allahabad",
-    "MNNIT Allahabad",
-    "KIET Group of Institutions, Ghaziabad",
-    "AKGEC Ghaziabad",
-    "ABES Engineering College, Ghaziabad",
-    "Amity University, Noida",
-    "Galgotias University",
-    "Jaypee Institute of Information Technology, Noida",
-    "Bennett University",
-  ],
-  Delhi: [
-    "IIT Delhi",
-    "IIIT Delhi",
-    "Delhi Technological University",
-    "NSUT Delhi",
-    "Jamia Millia Islamia",
-    "Maharaja Agrasen Institute of Technology",
-    "Bharati Vidyapeeth College of Engineering",
-  ],
-  Haryana: [
-    "NIT Kurukshetra",
-    "IIIT Sonepat",
-    "Amity University Gurugram",
-    "Maharshi Dayanand University",
-    "Manav Rachna University",
-  ],
-  Maharashtra: [
-    "IIT Bombay",
-    "VJTI Mumbai",
-    "COEP Pune",
-    "VIT Pune",
-    "Pune Institute of Computer Technology",
-    "VNIT Nagpur",
-  ],
-  Karnataka: [
-    "IIT Dharwad",
-    "NITK Surathkal",
-    "RV College of Engineering",
-    "PES University",
-    "BMS College of Engineering",
-    "IISc Bangalore",
-  ],
-  "Tamil Nadu": [
-    "IIT Madras",
-    "NIT Tiruchirappalli",
-    "Anna University",
-    "SRM Institute of Science and Technology",
-    "VIT Vellore",
-    "PSG College of Technology",
-  ],
-  Telangana: [
-    "IIT Hyderabad",
-    "IIIT Hyderabad",
-    "NIT Warangal",
-    "JNTU Hyderabad",
-    "CBIT Hyderabad",
-  ],
-  "West Bengal": [
-    "IIT Kharagpur",
-    "Jadavpur University",
-    "NIT Durgapur",
-    "IIEST Shibpur",
-  ],
-  Rajasthan: ["IIT Jodhpur", "MNIT Jaipur", "BITS Pilani", "LNMIIT Jaipur"],
-  Gujarat: [
-    "IIT Gandhinagar",
-    "DA-IICT Gandhinagar",
-    "NIT Surat",
-    "Nirma University",
-  ],
-  "Madhya Pradesh": [
-    "IIT Indore",
-    "IIIT Gwalior",
-    "MANIT Bhopal",
-    "SGSITS Indore",
-  ],
-  Punjab: [
-    "IIT Ropar",
-    "Thapar Institute of Engineering and Technology",
-    "Chitkara University",
-  ],
-  "Other state or union territory": [],
-};
 
 const ago = (t) => {
   const m = Math.round((Date.now() - t) / 6e4);
@@ -128,9 +29,74 @@ export function ProfileView() {
     setActiveModal,
     setModalData,
     getTopicRating,
+    refreshUser,
+    setAuthModalOpen,
   } = useCalibr8();
 
   const [act, setAct] = useState(state.act || "y");
+  const [profileStatus, setProfileStatus] = useState(null);
+  const [activityError, setActivityError] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(() =>
+    Boolean(tokenStorage.get()),
+  );
+
+  useEffect(() => {
+    if (!tokenStorage.get()) return undefined;
+    let active = true;
+    Promise.allSettled([usersApi.getProfile(), usersApi.getActivity()])
+      .then(([profileResult, activityResult]) => {
+        if (profileResult.status === "rejected") {
+          throw profileResult.reason;
+        }
+        const response = profileResult.value;
+        if (!response?.success || !response.user) {
+          throw new Error("The profile response was invalid.");
+        }
+        if (!active) return;
+        const user = response.user;
+        setState((current) => ({
+          ...current,
+          user,
+          name: user.name || current.name,
+          college: user.college || current.college,
+          activity:
+            activityResult.status === "fulfilled" &&
+            activityResult.value?.success &&
+            activityResult.value.activity
+              ? activityResult.value.activity
+              : {},
+          prof: {
+            ...current.prof,
+            country: user.country ?? current.prof?.country ?? "",
+            state: user.state ?? current.prof?.state ?? "",
+            college: user.college ?? current.prof?.college ?? "",
+            branch: user.branch ?? current.prof?.branch ?? "",
+            year: user.batch ?? current.prof?.year ?? "",
+          },
+        }));
+        if (activityResult.status === "rejected") {
+          setActivityError(
+            activityResult.reason?.message ||
+              "Could not load successful submission activity.",
+          );
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setProfileStatus({
+            type: "error",
+            message: err.message || "Could not load your backend profile.",
+          });
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingProfile(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [setState, state.user?.id]);
 
   const myName =
     state.name ||
@@ -138,63 +104,72 @@ export function ProfileView() {
       ? state.user.email?.split("@")[0]
       : "You");
 
-  const P = Object.assign(
-    {
-      country: "India",
-      state: "Uttar Pradesh",
-      college: "AKGEC Ghaziabad",
-      other: "",
-      degree: "B.Tech",
-      branch: "Computer Science",
-      year: "2026",
-    },
-    state.prof || {}
-  );
+  const P = {
+    country: state.user?.country ?? state.prof?.country ?? "",
+    state: state.user?.state ?? state.prof?.state ?? "",
+    college: state.user?.college ?? state.prof?.college ?? "",
+    branch: state.user?.branch ?? state.prof?.branch ?? "",
+    year: state.user?.batch ?? state.prof?.year ?? "",
+  };
 
   const n = useMemo(() => new Date(), []);
   const A = useMemo(() => state.activity || {}, [state.activity]);
-  const solvesCount = Object.keys(state.best || {}).length;
+  const solvesCount = state.user
+    ? Object.values(state.solved || {}).filter(Boolean).length
+    : Object.keys(state.best || {}).length;
   const L = state.levels || {};
 
   // Build Heatmap
   const { heatCells, monthLabels } = useMemo(() => {
     let ml = [];
     const start = new Date(
-      n.getFullYear(),
-      n.getMonth(),
-      n.getDate() - n.getDay() - 52 * 7
+      Date.UTC(
+        n.getUTCFullYear(),
+        n.getUTCMonth(),
+        n.getUTCDate() - n.getUTCDay() - 52 * 7,
+        12,
+      ),
     );
     let last = -9,
       lm = -1;
     for (let w = 0; w < 53; w++) {
       const d0 = new Date(
-        start.getFullYear(),
-        start.getMonth(),
-        start.getDate() + w * 7
+        Date.UTC(
+          start.getUTCFullYear(),
+          start.getUTCMonth(),
+          start.getUTCDate() + w * 7,
+          12,
+        )
       );
-      if (d0.getMonth() !== lm && w - last >= 3) {
+      if (d0.getUTCMonth() !== lm && w - last >= 3) {
         ml.push(
           <span key={w} style={{ gridColumn: w + 1 }}>
-            {d0.toLocaleString("en-US", { month: "short" })}
+            {d0.toLocaleString("en-US", { month: "short", timeZone: "UTC" })}
           </span>
         );
         last = w;
       }
-      lm = d0.getMonth();
+      lm = d0.getUTCMonth();
     }
 
     const cells = [];
     for (let i = 0; i < 53 * 7; i++) {
       const d = new Date(
-        start.getFullYear(),
-        start.getMonth(),
-        start.getDate() + i
+        Date.UTC(
+          start.getUTCFullYear(),
+          start.getUTCMonth(),
+          start.getUTCDate() + i,
+          12,
+        )
       );
-      if (d > n) {
+      if (
+        d.getTime() >
+        Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), 12)
+      ) {
         cells.push(<i key={`f_${i}`} style={{ visibility: "hidden" }} />);
         continue;
       }
-      const k = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+      const k = d.toISOString().slice(0, 10);
       const c = A[k] || 0;
       const hClass = c >= 4 ? "h3" : c >= 2 ? "h2" : c >= 1 ? "h1" : "";
       cells.push(
@@ -209,15 +184,20 @@ export function ProfileView() {
   const monthlyData = useMemo(() => {
     const list = [];
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(n.getFullYear(), n.getMonth() - i, 1);
-      const p = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      const d = new Date(
+        Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - i, 15, 12),
+      );
+      const p = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(
         2,
         "0"
       )}`;
       const count = Object.keys(A)
         .filter((k) => k.startsWith(p))
         .reduce((sum, k) => sum + A[k], 0);
-      list.push([d.toLocaleString("en-US", { month: "short" }), count]);
+      list.push([
+        d.toLocaleString("en-US", { month: "short", timeZone: "UTC" }),
+        count,
+      ]);
     }
     return list;
   }, [n, A]);
@@ -227,15 +207,10 @@ export function ProfileView() {
   const activeDays = Object.keys(A).length;
 
   // Rating history chart
-  const H = state.hist || [
-    { r: 1200 },
-    { r: 1350 },
-    { r: 1480 },
-    { r: state.rating || 1630 },
-  ];
+  const H = state.hist || [];
   const rs = H.map((h) => h.r);
-  const lo = Math.min(...rs) - 40;
-  const hi = Math.max(...rs) + 40;
+  const lo = rs.length ? Math.min(...rs) - 40 : 0;
+  const hi = rs.length ? Math.max(...rs) + 40 : 1;
   const W = 520;
   const Hh = 150;
   const points = H.map(
@@ -260,18 +235,18 @@ export function ProfileView() {
     ["Note taker", Object.values(state.notes || {}).some(Boolean), "📝"],
   ];
 
-  const handleProfileFieldChange = (field, value) => {
-    const updated = { ...P, [field]: value };
-    const resolvedCollege =
-      updated.college === "Other (type below)" || updated.country === "Other"
-        ? updated.other
-        : updated.college;
+  const handleProfileFieldsChange = (changes) => {
+    const updated = { ...P, ...changes };
 
     setState((s) => ({
       ...s,
       prof: updated,
-      college: resolvedCollege,
+      college: updated.college,
     }));
+  };
+
+  const handleProfileFieldChange = (field, value) => {
+    handleProfileFieldsChange({ [field]: value });
   };
 
   const handleNameChange = (e) => {
@@ -283,14 +258,49 @@ export function ProfileView() {
     setState((s) => ({ ...s, avatar: av }));
   };
 
+  const saveProfile = async () => {
+    const name = state.name?.trim();
+    if (!name) {
+      setProfileStatus({ type: "error", message: "Enter a name before saving." });
+      return;
+    }
+    if (!tokenStorage.get()) {
+      setProfileStatus({
+        type: "error",
+        message: "Sign in to save your profile to the backend.",
+      });
+      setAuthModalOpen(true);
+      return;
+    }
+
+    setSavingProfile(true);
+    setProfileStatus(null);
+    try {
+      await usersApi.updateName({ name });
+      await usersApi.updateAcademic({
+        college: P.college,
+        branch: P.branch,
+        batch: String(P.year || ""),
+        state: P.state,
+        country: P.country,
+      });
+      setState((current) => ({ ...current, prof: P, name }));
+      await refreshUser();
+      setProfileStatus({ type: "success", message: "Profile saved to your account." });
+    } catch (err) {
+      setProfileStatus({
+        type: "error",
+        message: err.message || "Could not save your profile.",
+      });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   const handleActToggle = (mode) => {
     setAct(mode);
     setState((s) => ({ ...s, act: mode }));
   };
-
-  const stateColleges = COLLEGES[P.state] || [];
-  const showCustomCollege =
-    P.college === "Other (type below)" || P.country === "Other";
 
   return (
     <div>
@@ -352,112 +362,84 @@ export function ProfileView() {
             </label>
 
             <label>
-              Country
-              <select
-                id="pco"
-                value={P.country}
-                onChange={(e) => handleProfileFieldChange("country", e.target.value)}
-              >
-                <option value="India">India</option>
-                <option value="Other">Other</option>
-              </select>
-            </label>
-
-            <label>
-              State
-              <select
-                id="pst"
-                value={P.state}
-                onChange={(e) => {
-                  handleProfileFieldChange("state", e.target.value);
-                  handleProfileFieldChange("college", "");
-                }}
-              >
-                <option value="">Select state</option>
-                {Object.keys(COLLEGES).map((st) => (
-                  <option key={st} value={st}>
-                    {st}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
               College
-              <select
+              <input
                 id="pcl"
                 value={P.college}
-                onChange={(e) => handleProfileFieldChange("college", e.target.value)}
-              >
-                <option value="">Select college</option>
-                {stateColleges.map((col) => (
-                  <option key={col} value={col}>
-                    {col}
-                  </option>
-                ))}
-                <option value="Other (type below)">Other (type below)</option>
-              </select>
-            </label>
-
-            {showCustomCollege && (
-              <label id="pcnw">
-                College name
-                <input
-                  id="pcn"
-                  value={P.other}
-                  placeholder="Type your college"
-                  onChange={(e) => handleProfileFieldChange("other", e.target.value)}
-                />
-              </label>
-            )}
-
-            <label>
-              Degree
-              <select
-                id="pdg"
-                value={P.degree}
-                onChange={(e) => handleProfileFieldChange("degree", e.target.value)}
-              >
-                {DEGREES.map((deg) => (
-                  <option key={deg} value={deg}>
-                    {deg}
-                  </option>
-                ))}
-              </select>
+                placeholder="Enter your college"
+                onChange={(e) =>
+                  handleProfileFieldChange("college", e.target.value)
+                }
+              />
             </label>
 
             <label>
               Branch
-              <select
+              <input
                 id="pbr"
                 value={P.branch}
-                onChange={(e) => handleProfileFieldChange("branch", e.target.value)}
-              >
-                <option value="">Select branch</option>
-                {BRANCHES.map((br) => (
-                  <option key={br} value={br}>
-                    {br}
-                  </option>
-                ))}
-              </select>
+                placeholder="Enter your branch"
+                onChange={(e) =>
+                  handleProfileFieldChange("branch", e.target.value)
+                }
+              />
             </label>
 
             <label>
               Graduation year
-              <select
+              <input
                 id="pyr"
+                type="text"
+                inputMode="numeric"
                 value={P.year}
+                placeholder="Enter graduation year"
                 onChange={(e) => handleProfileFieldChange("year", e.target.value)}
-              >
-                <option value="">Select year</option>
-                {YEARS.map((yr) => (
-                  <option key={yr} value={yr}>
-                    {yr}
-                  </option>
-                ))}
-              </select>
+              />
+            </label>
+
+            <label>
+              State
+              <input
+                id="pst"
+                value={P.state}
+                placeholder="Enter your state"
+                onChange={(e) => handleProfileFieldChange("state", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Country
+              <input
+                id="pco"
+                value={P.country}
+                placeholder="Enter your country"
+                onChange={(e) =>
+                  handleProfileFieldChange("country", e.target.value)
+                }
+              />
             </label>
           </div>
+          <p className="mu">
+            Avatar is stored on this device. Name and the profile fields supported
+            by your account are saved to the backend.
+          </p>
+          {loadingProfile && <p className="mu">Loading account profile…</p>}
+          {profileStatus && (
+            <p
+              role={profileStatus.type === "error" ? "alert" : "status"}
+              className={profileStatus.type === "error" ? "mu" : "ok"}
+              style={
+                profileStatus.type === "error"
+                  ? { color: "#FF8A9B" }
+                  : undefined
+              }
+            >
+              {profileStatus.message}
+            </p>
+          )}
+          <button className="btn" onClick={saveProfile} disabled={savingProfile}>
+            {savingProfile ? "Saving…" : "Save profile"}
+          </button>
         </div>
 
         {/* Stats Card */}
@@ -467,9 +449,14 @@ export function ProfileView() {
             <span>Questions solved</span>
             <b>{solvesCount}</b>
           </div>
+
           <div className="tr">
             <span>Score</span>
-            <b>{Math.floor((state.score || 0) / 10).toLocaleString()}</b>
+            <b>
+              {Number(
+                state.user ? state.user.score : Math.floor((state.score || 0) / 10),
+              ).toLocaleString()}
+            </b>
           </div>
           <div className="tr">
             <span>Coins</span>
@@ -484,6 +471,8 @@ export function ProfileView() {
             <b>{state.wordsLearned || 0}</b>
           </div>
         </div>
+
+        <ConnectedAccounts onRequireAuth={() => setAuthModalOpen(true)} />
 
         {/* Tier Graph Card */}
         <div className="card">
@@ -531,9 +520,10 @@ export function ProfileView() {
             </span>
           </div>
           <p className="mu">
-            {totalSubs} submission(s) in the last year, {activeDays} active day(s), best streak{" "}
+            {totalSubs} fully accepted submission(s) in the last year, {activeDays} active day(s), best streak{" "}
             {Math.max(state.longest || 0, state.streak || 0)}.
           </p>
+          {activityError && <p className="mu">{activityError}</p>}
           {act === "y" ? (
             <div className="hmw">
               <div className="ml">{monthLabels}</div>

@@ -80,7 +80,7 @@ export function StatInfoModal() {
 
           <h3>Streak Multipliers</h3>
           <p className="mu" style={{ fontSize: "13px", margin: "4px 0 16px" }}>
-            Milestones at 7, 14, 30, and 100 days grant free store coins and bonus dry runs.
+            Milestones at 7, 14, 30, and 100 days grant free store coins.
           </p>
 
           <button
@@ -102,23 +102,16 @@ export function StatInfoModal() {
         <div>
           <h2>Coins: {state.coins || 0} 🪙</h2>
           <p className="mu" style={{ margin: "6px 0 14px" }}>
-            Coins are earned through verified practice, daily completions, and vocabulary words. Spend them on cosmetics and dry run compilations.
+            Coins are earned through verified practice, daily completions, and vocabulary words. Spend them on cosmetics.
           </p>
 
-          <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
+          <div className="grid" style={{ gridTemplateColumns: "1fr", gap: "10px", marginBottom: "14px" }}>
             <div className="card" style={{ padding: "12px" }}>
               <b>Store Skins</b>
               <div className="mu" style={{ fontSize: "12px", margin: "4px 0 8px" }}>
                 Orbit, Frost, Arcade, Racer and more themes.
               </div>
               <span className="ok">400 - 550 Coins</span>
-            </div>
-            <div className="card" style={{ padding: "12px" }}>
-              <b>Dry Runs</b>
-              <div className="mu" style={{ fontSize: "12px", margin: "4px 0 8px" }}>
-                Test your code against hidden test cases.
-              </div>
-              <span className="ok">80 Coins / 5 runs</span>
             </div>
           </div>
 

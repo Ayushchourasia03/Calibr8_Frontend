@@ -286,7 +286,6 @@ export function OnboardingModal() {
         rating: result.user?.rating ?? (avgRating || 800),
         lang: selectedLang,
         calibrating: true,
-        freeDry: s.freeDry || 3,
         view: "home",
         user: s.user
           ? { ...s.user, ...(result.user || {}), onboarded: true }

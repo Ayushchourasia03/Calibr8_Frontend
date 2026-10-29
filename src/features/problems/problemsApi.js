@@ -6,15 +6,17 @@ import { request } from "../../services/apiClient";
 
 export const problemsApi = {
   /**
-   * List all problems with optional difficulty & search filters.
+   * List problems with optional catalog filters.
    * GET /api/problems
    */
-  getAll: async ({ difficulty, search } = {}) => {
+  getAll: async ({ difficulty, search, topic, status, signal } = {}) => {
     const params = new URLSearchParams();
     if (difficulty) params.append("difficulty", difficulty);
     if (search) params.append("search", search);
+    if (topic) params.append("topic", topic);
+    if (status) params.append("status", status);
     const query = params.toString() ? `?${params.toString()}` : "";
-    return await request(`/problems${query}`, { method: "GET" });
+    return await request(`/problems${query}`, { method: "GET", signal });
   },
 
   /**

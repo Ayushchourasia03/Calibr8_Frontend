@@ -64,7 +64,7 @@ export function MonacoEditor({
         return;
       }
 
-      // Hotkey: Ctrl+Enter or Cmd+Enter -> Run / Dry Run
+      // Hotkey: Ctrl+Enter or Cmd+Enter -> Run visible samples
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "Enter") {
         e.preventDefault();
         onRun?.();
@@ -82,7 +82,7 @@ export function MonacoEditor({
     // Format document action if supported
     editor.addAction({
       id: "run-code-action",
-      label: "Run Code (Dry Run)",
+      label: "Run Code",
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       run: () => onRun?.(),
     });

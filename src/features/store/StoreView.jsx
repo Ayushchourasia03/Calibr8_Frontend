@@ -11,7 +11,6 @@ export function StoreView() {
     previewSkinId,
     setPreviewSkinId,
     buyOrApplySkin,
-    showToast,
   } = useCalibr8();
 
   useEffect(() => {
@@ -39,19 +38,6 @@ export function StoreView() {
 
   const ownedSkins = state.ownedSkins || ["default"];
   const currentSkin = state.skin || "default";
-
-  const handleBuyDryRuns = () => {
-    if (state.coins < 80) {
-      showToast("Not enough coins. 5 dry runs cost 80 coins.");
-      return;
-    }
-    setState((s) => ({
-      ...s,
-      coins: s.coins - 80,
-      freeDry: (s.freeDry || 0) + 5,
-    }));
-    showToast("Purchased 5 dry runs for 80 coins!");
-  };
 
   const handlePreview = (skinId) => {
     setPreviewSkinId(skinId);
@@ -160,14 +146,6 @@ export function StoreView() {
             </div>
           );
         })}
-
-        <div className="card">
-          <h3>Dry run pack</h3>
-          <p className="mu">5 dry runs for 80 coins.</p>
-          <button className="btn" id="dp" onClick={handleBuyDryRuns}>
-            Buy
-          </button>
-        </div>
       </div>
     </div>
   );

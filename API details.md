@@ -1382,7 +1382,7 @@ Allows setting or changing the student's preferred programming language during o
 ### 10.1 List Supported Languages
 
 - **Method & Path**: `GET /api/execution/languages`
-- **Protected**: Yes (`Authorization: Bearer <token>`)
+- **Protected**: No (`Authorization: Bearer <token>`)
 - **Success Response (200 OK)**:
 
 ```json
@@ -1404,6 +1404,12 @@ Allows setting or changing the student's preferred programming language during o
     {
       "key": "cpp",
       "label": "C++",
+      "version": "GCC 13",
+      "starterAvailable": true
+    },
+    {
+      "key": "c",
+      "label": "C",
       "version": "GCC 13",
       "starterAvailable": true
     },
@@ -1450,10 +1456,13 @@ _Note_: Also accepts `problemId` in place of `slug`. Maximum code size is 64 KB.
   "cases": [
     {
       "index": 0,
+      "testIndex": 0,
+      "isVisible": true,
       "input": "4\n2 7 11 15\n9",
       "expected": "0 1",
       "actual": "0 1",
       "studentStdout": "debugging: 9\n",
+      "passed": true,
       "status": "Accepted",
       "timeMs": 42,
       "memoryKb": 12800
@@ -1495,6 +1504,8 @@ _Note_: Also accepts `problemId` in place of `slug`. Maximum code size is 64 KB.
 }
 ```
 
+The submission is evaluated against all visible and hidden testcases. Poll the returned URL until the status is terminal. A completed response includes per-testcase `results`; visible testcase details include input and outputs, while hidden testcase details include only the testcase index, pass status, verdict, and resource usage.
+
 ---
 
 ### 10.4 Poll Submission Status
@@ -1515,6 +1526,25 @@ _Note_: Also accepts `problemId` in place of `slug`. Maximum code size is 64 KB.
     "status": "ACCEPTED",
     "passedCount": 15,
     "totalCount": 15,
+    "results": [
+      {
+        "testIndex": 0,
+        "isVisible": true,
+        "passed": true,
+        "status": "Accepted",
+        "input": "4\n2 7 11 15\n9",
+        "expected": "0 1",
+        "actual": "0 1"
+      },
+      {
+        "testIndex": 1,
+        "isVisible": false,
+        "passed": true,
+        "status": "Accepted",
+        "time": 58,
+        "memory": 14200
+      }
+    ],
     "time": "58ms",
     "memory": 14200,
     "createdAt": "2026-10-24T06:55:00.000Z",
