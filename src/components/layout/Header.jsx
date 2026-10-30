@@ -89,10 +89,8 @@ export function Header() {
     isSignedIn && !headerStats
       ? "—"
       : Math.floor((state.score || 0) / 10).toLocaleString();
-  const coinsLabel =
-    isSignedIn && !headerStats ? "—" : state.coins || 0;
-  const streakLabel =
-    isSignedIn && !headerStats ? "—" : state.streak || 0;
+  const coinsLabel = isSignedIn && !headerStats ? "—" : state.coins || 0;
+  const streakLabel = isSignedIn && !headerStats ? "—" : state.streak || 0;
 
   return (
     <header>
@@ -134,8 +132,7 @@ export function Header() {
 
         <div className="stats">
           <span className="stbtn" onClick={handleTierClick}>
-            Tier{" "}
-            <b id="sTier">{tierLabel}</b>
+            Tier <b id="sTier">{tierLabel}</b>
           </span>
           <span className="stbtn" onClick={() => handleStatClick("score")}>
             Score <b id="sScore">{scoreLabel}</b>
@@ -171,6 +168,7 @@ export function Header() {
 
       {menuOpen && (
         <div id="amenu" ref={menuRef}>
+         
           <div className="mh">
             <span className="av sm">{state.avatar || "🙂"}</span>
             <div>
@@ -199,10 +197,7 @@ export function Header() {
               handleTierClick();
             }}
           >
-            Tier{" "}
-            <b>
-              {tierLabel}
-            </b>
+            Tier <b>{tierLabel}</b>
           </button>
           <button
             onClick={() => {
