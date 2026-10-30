@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   --bg: #000;
   --card: rgba(8, 16, 34, 0.72);
   --fg: #eaf2ff;
@@ -1365,6 +1365,7 @@ details[open] summary {
    EXACT LIGHT MODE OVERRIDES AS PER HTML
    ========================================================================== */
 :root[data-theme="light"] {
+  color-scheme: light;
   --bg: #eef3ff;
   --card: #ffffff;
   --fg: #0a1530;
@@ -1374,6 +1375,9 @@ details[open] summary {
   --ac: #1f6feb;
   --ac2: #6a5cff;
   --code: #f4f7ff;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 :root[data-theme="light"] body {
   background:

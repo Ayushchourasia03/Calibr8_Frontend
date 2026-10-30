@@ -536,8 +536,8 @@ export function Calibr8Provider({ children }) {
     return res;
   };
 
-  const register = async ({ name, email, password, role = "user" }) => {
-    const res = await api.auth.register({ name, email, password, role });
+  const register = async ({ name, email, password }) => {
+    const res = await api.auth.register({ name, email, password });
     if (res?.success && res.user) {
       const u = res.user;
       setState((s) => ({

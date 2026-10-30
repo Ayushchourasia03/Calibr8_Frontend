@@ -29,13 +29,11 @@ export function ProfileView() {
     setActiveModal,
     setModalData,
     getTopicRating,
-    refreshUser,
     setAuthModalOpen,
   } = useCalibr8();
 
   const [act, setAct] = useState(state.act || "y");
   const [profileStatus, setProfileStatus] = useState(null);
-  const [activityError, setActivityError] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(() =>
     Boolean(tokenStorage.get()),
@@ -44,12 +42,9 @@ export function ProfileView() {
   useEffect(() => {
     if (!tokenStorage.get()) return undefined;
     let active = true;
-    Promise.allSettled([usersApi.getProfile(), usersApi.getActivity()])
-      .then(([profileResult, activityResult]) => {
-        if (profileResult.status === "rejected") {
-          throw profileResult.reason;
-        }
-        const response = profileResult.value;
+    usersApi
+      .getProfileOverview()
+      .then((response) => {
         if (!response?.success || !response.user) {
           throw new Error("The profile response was invalid.");
         }
@@ -60,12 +55,7 @@ export function ProfileView() {
           user,
           name: user.name || current.name,
           college: user.college || current.college,
-          activity:
-            activityResult.status === "fulfilled" &&
-            activityResult.value?.success &&
-            activityResult.value.activity
-              ? activityResult.value.activity
-              : {},
+          activity: response.activity || {},
           prof: {
             ...current.prof,
             country: user.country ?? current.prof?.country ?? "",
@@ -75,12 +65,6 @@ export function ProfileView() {
             year: user.batch ?? current.prof?.year ?? "",
           },
         }));
-        if (activityResult.status === "rejected") {
-          setActivityError(
-            activityResult.reason?.message ||
-              "Could not load successful submission activity.",
-          );
-        }
       })
       .catch((err) => {
         if (active) {
@@ -276,16 +260,24 @@ export function ProfileView() {
     setSavingProfile(true);
     setProfileStatus(null);
     try {
-      await usersApi.updateName({ name });
-      await usersApi.updateAcademic({
+      const response = await usersApi.updateProfile({
+        name,
         college: P.college,
         branch: P.branch,
         batch: String(P.year || ""),
         state: P.state,
         country: P.country,
       });
-      setState((current) => ({ ...current, prof: P, name }));
-      await refreshUser();
+      if (!response?.success || !response.user) {
+        throw new Error("The profile save response was invalid.");
+      }
+      setState((current) => ({
+        ...current,
+        user: response.user,
+        prof: P,
+        name: response.user.name || name,
+        college: response.user.college || P.college,
+      }));
       setProfileStatus({ type: "success", message: "Profile saved to your account." });
     } catch (err) {
       setProfileStatus({
@@ -523,7 +515,6 @@ export function ProfileView() {
             {totalSubs} fully accepted submission(s) in the last year, {activeDays} active day(s), best streak{" "}
             {Math.max(state.longest || 0, state.streak || 0)}.
           </p>
-          {activityError && <p className="mu">{activityError}</p>}
           {act === "y" ? (
             <div className="hmw">
               <div className="ml">{monthLabels}</div>

@@ -8,9 +8,9 @@ export const authApi = {
   /**
    * Register a new user account.
    * POST /api/auth/register
-   * Body: { email, password, name, role }
+   * Body: { email, password, name }
    */
-  register: async ({ name, email, password, role = "user" }) => {
+  register: async ({ name, email, password }) => {
     // Client-side security sanitization & validation
     const cleanEmail = (email || "").toLowerCase().trim();
     const cleanName = (name || "").trim();
@@ -30,7 +30,7 @@ export const authApi = {
 
     const res = await request("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ name: cleanName, email: cleanEmail, password, role }),
+      body: JSON.stringify({ name: cleanName, email: cleanEmail, password }),
     });
 
     if (res?.token) {

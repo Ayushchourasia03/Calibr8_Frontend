@@ -6,6 +6,14 @@ import { request } from "../../services/apiClient";
 
 export const usersApi = {
   /**
+   * Get profile details and activity data in one request.
+   * GET /api/users/me/overview (Protected)
+   */
+  getProfileOverview: async () => {
+    return await request("/users/me/overview", { method: "GET" });
+  },
+
+  /**
    * Get user profile details.
    * GET /api/users/me (Protected: Bearer <token>)
    */
@@ -29,6 +37,17 @@ export const usersApi = {
     return await request("/users/me", {
       method: "PUT",
       body: JSON.stringify({ name }),
+    });
+  },
+
+  /**
+   * Update the profile page's editable fields in one request.
+   * PATCH /api/users/me (Protected)
+   */
+  updateProfile: async ({ name, college, branch, batch, state, country }) => {
+    return await request("/users/me", {
+      method: "PATCH",
+      body: JSON.stringify({ name, college, branch, batch, state, country }),
     });
   },
 
