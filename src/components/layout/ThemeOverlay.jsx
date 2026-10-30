@@ -16,7 +16,10 @@ const MUS = {
 
 export function ThemeOverlay() {
   const { state, previewSkinId, tierInfo } = useCalibr8();
-  const activeSkin = previewSkinId || state.skin || "default";
+  const activeSkin =
+    state.view === "landing"
+      ? "default"
+      : previewSkinId || state.skin || "default";
 
   const [playingSkin, setPlayingSkin] = useState(null);
   const audioCtxRef = useRef(null);

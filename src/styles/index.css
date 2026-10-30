@@ -3107,7 +3107,11 @@ body:has(.land)::before,
   text-align: center;
   padding: 14px 10px 0;
   border-radius: 18px 18px 0 0;
-  background: linear-gradient(180deg, rgba(124, 108, 240, 0.28), rgba(124, 108, 240, 0.06));
+  background: linear-gradient(
+    180deg,
+    rgba(124, 108, 240, 0.28),
+    rgba(124, 108, 240, 0.06)
+  );
   border: 1px solid var(--ln);
   border-bottom: 0;
   display: flex;
@@ -3116,7 +3120,11 @@ body:has(.land)::before,
 }
 .pc.p1 {
   min-height: 290px;
-  background: linear-gradient(180deg, rgba(255, 200, 60, 0.35), rgba(255, 200, 60, 0.06));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 200, 60, 0.35),
+    rgba(255, 200, 60, 0.06)
+  );
 }
 .pc.p2 {
   min-height: 240px;
@@ -3150,7 +3158,10 @@ body:has(.land)::before,
   margin-top: auto;
   width: 100%;
   padding: 8px 0;
-  font: 700 22px "Space Grotesk", system-ui, sans-serif;
+  font:
+    700 22px "Space Grotesk",
+    system-ui,
+    sans-serif;
   background: var(--cf);
   border-top: 1px solid var(--ln);
 }
@@ -3240,7 +3251,7 @@ body:has(.land)::before,
   place-items: center;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #2F7BFF, #B16BFF);
+  background: linear-gradient(135deg, #2f7bff, #b16bff);
 }
 
 /* Pulse Animation for Shield */
@@ -3249,7 +3260,7 @@ body:has(.land)::before,
 }
 @keyframes shp {
   50% {
-    filter: drop-shadow(0 0 22px #FF4F7A) brightness(1.15);
+    filter: drop-shadow(0 0 22px #ff4f7a) brightness(1.15);
   }
 }
 
@@ -3276,7 +3287,9 @@ body:has(.land)::before,
   background: var(--card);
   color: var(--fg);
   cursor: pointer;
-  font: 600 12px system-ui, sans-serif;
+  font:
+    600 12px system-ui,
+    sans-serif;
   backdrop-filter: blur(12px);
 }
 
@@ -3288,7 +3301,7 @@ body:has(.land)::before,
   bottom: 0;
   height: 38px;
   background: #1a1a1f;
-  border-top: 3px solid #FF1E1E;
+  border-top: 3px solid #ff1e1e;
 }
 .d-racer .road:before {
   content: "";
@@ -3297,7 +3310,11 @@ body:has(.land)::before,
   right: 0;
   top: 17px;
   height: 3px;
-  background: repeating-linear-gradient(90deg, #fff 0 24px, transparent 24px 48px);
+  background: repeating-linear-gradient(
+    90deg,
+    #fff 0 24px,
+    transparent 24px 48px
+  );
   opacity: 0.7;
 }
 .d-racer .car {
@@ -3333,7 +3350,7 @@ body:has(.land)::before,
 /* Arcade Decorations */
 .d-arcade .star {
   position: absolute;
-  color: #00FFC6;
+  color: #00ffc6;
   animation: tw 2s infinite;
 }
 .d-arcade .s1 {
@@ -3358,18 +3375,24 @@ body:has(.land)::before,
   left: 50%;
   bottom: 10px;
   transform: translateX(-50%);
-  font: 700 12px Orbitron, monospace;
-  color: #00FFC6;
+  font:
+    700 12px Orbitron,
+    monospace;
+  color: #00ffc6;
   padding: 4px 10px;
-  border: 2px solid #00FFC6;
-  background: #0B0620;
+  border: 2px solid #00ffc6;
+  background: #0b0620;
 }
 .d-arcade .hud b {
   display: inline-block;
   width: 80px;
   height: 8px;
   margin-left: 8px;
-  background: repeating-linear-gradient(90deg, #00FFC6 0 8px, transparent 8px 10px);
+  background: repeating-linear-gradient(
+    90deg,
+    #00ffc6 0 8px,
+    transparent 8px 10px
+  );
   vertical-align: middle;
 }
 
@@ -3391,10 +3414,15 @@ body:has(.land)::before,
   position: absolute;
   right: 30px;
   bottom: 30px;
-  font: 400 38px Bangers, Impact, sans-serif;
-  color: #E5232B;
+  font:
+    400 38px Bangers,
+    Impact,
+    sans-serif;
+  color: #e5232b;
   transform: rotate(-10deg);
-  text-shadow: 3px 3px 0 #111, -1px -1px 0 #fff;
+  text-shadow:
+    3px 3px 0 #111,
+    -1px -1px 0 #fff;
   opacity: 0.85;
 }
 
@@ -3425,66 +3453,79 @@ body:has(.land)::before,
 
 /* Anime Theme */
 :root[data-skin="anime"] {
-  --bg: #FFF4F8;
-  --card: #FFFFFF;
-  --fg: #1A1A1A;
-  --mu: #6B5A63;
-  --ln: #1A1A1A;
-  --ac: #FF4F8B;
-  --ac2: #4FC3FF;
+  --bg: #fff4f8;
+  --card: #ffffff;
+  --fg: #1a1a1a;
+  --mu: #6b5a63;
+  --ln: #1a1a1a;
+  --ac: #ff4f8b;
+  --ac2: #4fc3ff;
   --cf: rgba(255, 79, 139, 0.1);
-  --code: #FFF8FB;
+  --code: #fff8fb;
 }
 :root[data-skin="anime"] body {
-  background: repeating-conic-gradient(from 0deg at 80% 10%, #FFE3EE 0 4deg, #FFF4F8 4deg 8deg);
+  background: repeating-conic-gradient(
+    from 0deg at 80% 10%,
+    #ffe3ee 0 4deg,
+    #fff4f8 4deg 8deg
+  );
 }
 :root[data-skin="anime"] :is(h1, h2, h3, .logo, .big, .word, .hero h1) {
   font-family: Fredoka, "Segoe UI", sans-serif;
   font-weight: 700;
   background: none;
-  color: #1A1A1A;
-  -webkit-text-fill-color: #1A1A1A;
+  color: #1a1a1a;
+  -webkit-text-fill-color: #1a1a1a;
   letter-spacing: 0;
 }
 :root[data-skin="anime"] :is(.card, header, #dock, .sheet, .stbtn, main) {
-  border: 3px solid #1A1A1A;
+  border: 3px solid #1a1a1a;
   border-radius: 18px;
   background: #fff;
-  box-shadow: 5px 5px 0 #1A1A1A;
+  box-shadow: 5px 5px 0 #1a1a1a;
 }
 :root[data-skin="anime"] main {
   background: rgba(255, 255, 255, 0.9);
 }
-:root[data-skin="anime"] :is(button.btn:not(.ghost), .chip.on, #dock button.on, nav button.on, .pill.on) {
-  background: #FF4F8B;
+:root[data-skin="anime"]
+  :is(
+    button.btn:not(.ghost),
+    .chip.on,
+    #dock button.on,
+    nav button.on,
+    .pill.on
+  ) {
+  background: #ff4f8b;
   color: #fff;
-  border: 3px solid #1A1A1A;
+  border: 3px solid #1a1a1a;
   border-radius: 14px;
-  box-shadow: 3px 3px 0 #1A1A1A;
+  box-shadow: 3px 3px 0 #1a1a1a;
   font-weight: 700;
 }
 :root[data-skin="anime"] .bar {
-  border: 2px solid #1A1A1A;
+  border: 2px solid #1a1a1a;
   height: 12px;
 }
 :root[data-skin="anime"] .bar i {
-  background: #FF4F8B !important;
+  background: #ff4f8b !important;
 }
 
 /* Comic Theme */
 :root[data-skin="comic"] {
-  --bg: #FFF2A8;
+  --bg: #fff2a8;
   --card: #fff;
   --fg: #111;
   --mu: #444;
   --ln: #111;
-  --ac: #E5232B;
-  --ac2: #1F5FBF;
+  --ac: #e5232b;
+  --ac2: #1f5fbf;
   --cf: rgba(229, 35, 43, 0.1);
-  --code: #FFFDF0;
+  --code: #fffdf0;
 }
 :root[data-skin="comic"] body {
-  background: radial-gradient(#E5232B 1.4px, transparent 1.5px) 0 0/14px 14px, #FFF2A8;
+  background:
+    radial-gradient(#e5232b 1.4px, transparent 1.5px) 0 0/14px 14px,
+    #fff2a8;
 }
 :root[data-skin="comic"] :is(h1, h2, h3, .logo, .big, .word, .hero h1) {
   font-family: Bangers, Impact, sans-serif;
@@ -3508,8 +3549,15 @@ body:has(.land)::before,
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 8px 8px 0 #111;
 }
-:root[data-skin="comic"] :is(button.btn:not(.ghost), .chip.on, #dock button.on, nav button.on, .pill.on) {
-  background: #E5232B;
+:root[data-skin="comic"]
+  :is(
+    button.btn:not(.ghost),
+    .chip.on,
+    #dock button.on,
+    nav button.on,
+    .pill.on
+  ) {
+  background: #e5232b;
   color: #fff;
   border: 3px solid #111;
   border-radius: 4px;
@@ -3523,54 +3571,61 @@ body:has(.land)::before,
   border: 2px solid #111;
 }
 :root[data-skin="comic"] .bar i {
-  background: #E5232B !important;
+  background: #e5232b !important;
 }
 
 /* Storybook Theme */
 :root[data-skin="storybook"] {
-  --bg: #DCEBFF;
-  --card: #FFF8E7;
-  --fg: #3A2A12;
-  --mu: #7A6340;
-  --ln: #C9922E;
-  --ac: #C9922E;
-  --ac2: #7A5FD0;
+  --bg: #dcebff;
+  --card: #fff8e7;
+  --fg: #3a2a12;
+  --mu: #7a6340;
+  --ln: #c9922e;
+  --ac: #c9922e;
+  --ac2: #7a5fd0;
   --cf: rgba(201, 146, 46, 0.12);
-  --code: #FFFBEF;
+  --code: #fffbef;
 }
 :root[data-skin="storybook"] body {
-  background: linear-gradient(180deg, #BFD9FF, #F5E6FF 60%, #FFE9C9);
+  background: linear-gradient(180deg, #bfd9ff, #f5e6ff 60%, #ffe9c9);
 }
 :root[data-skin="storybook"] :is(h1, h2, h3, .logo, .big, .word, .hero h1) {
   font-family: Cinzel, Georgia, serif;
   font-weight: 700;
   background: none;
-  color: #8A5A12;
-  -webkit-text-fill-color: #8A5A12;
+  color: #8a5a12;
+  -webkit-text-fill-color: #8a5a12;
   letter-spacing: 0.02em;
 }
 :root[data-skin="storybook"] :is(.card, header, #dock, .sheet, .stbtn) {
-  border: 2px solid #C9922E;
+  border: 2px solid #c9922e;
   border-radius: 22px;
-  background: #FFF8E7;
+  background: #fff8e7;
   box-shadow: 0 10px 24px -12px rgba(122, 95, 208, 0.5);
 }
 :root[data-skin="storybook"] main {
-  border: 2px solid #E3C078;
+  border: 2px solid #e3c078;
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.55);
   box-shadow: none;
 }
-:root[data-skin="storybook"] :is(button.btn:not(.ghost), .chip.on, #dock button.on, nav button.on, .pill.on) {
-  background: linear-gradient(135deg, #E8B54A, #C9922E);
-  color: #3A2A12;
-  border: 1px solid #8A5A12;
+:root[data-skin="storybook"]
+  :is(
+    button.btn:not(.ghost),
+    .chip.on,
+    #dock button.on,
+    nav button.on,
+    .pill.on
+  ) {
+  background: linear-gradient(135deg, #e8b54a, #c9922e);
+  color: #3a2a12;
+  border: 1px solid #8a5a12;
   border-radius: 999px;
-  box-shadow: 0 6px 14px -6px #8A5A12;
+  box-shadow: 0 6px 14px -6px #8a5a12;
   font-weight: 700;
 }
 :root[data-skin="storybook"] .bar i {
-  background: linear-gradient(90deg, #E8B54A, #7A5FD0) !important;
+  background: linear-gradient(90deg, #e8b54a, #7a5fd0) !important;
 }
 
 /* Account dropdown menu */
@@ -3578,16 +3633,16 @@ body:has(.land)::before,
   position: fixed;
   right: 14px;
   top: 66px;
-  z-index: 30;
+  z-index: 9999;
   width: 250px;
   padding: 10px;
   border-radius: 16px;
-  background: var(--card);
+  background: var(--bg);
   border: 1px solid var(--ln);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
   box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.5);
   color: var(--fg);
+  overflow: hidden;
+  isolation: isolate;
 }
 #amenu .mh {
   display: flex;
@@ -3630,7 +3685,9 @@ body:has(.land)::before,
   border: 1px solid rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 20px 50px -15px rgba(100, 140, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 20px 50px -15px rgba(100, 140, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   width: 76px;
   align-items: center;
 }
@@ -3663,7 +3720,7 @@ body:has(.land)::before,
   font-style: normal;
   font-size: 11px;
   font-weight: 600;
-  color: #4A5568;
+  color: #4a5568;
   letter-spacing: -0.01em;
   line-height: 1.1;
   pointer-events: none;
@@ -3675,7 +3732,7 @@ body:has(.land)::before,
 }
 
 #dock button.on {
-  background: linear-gradient(135deg, #3B82F6 0%, #6366F1 50%, #8B5CF6 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);
   border-radius: 22px;
   box-shadow: 0 10px 24px -4px rgba(99, 102, 241, 0.65);
 }

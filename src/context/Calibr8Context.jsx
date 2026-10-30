@@ -175,15 +175,20 @@ export function Calibr8Provider({ children }) {
 
   // Sync skin and theme attributes to HTML root
   useEffect(() => {
-    const currentSkin = previewSkinId || state.skin || "default";
+    const isLanding = state.view === "landing";
+    const currentSkin = isLanding
+      ? "default"
+      : previewSkinId || state.skin || "default";
     document.documentElement.dataset.skin = currentSkin;
     const skinDef = SKINS[currentSkin];
-    if (skinDef?.themeMode) {
+    if (isLanding) {
+      document.documentElement.dataset.theme = "light";
+    } else if (skinDef?.themeMode) {
       document.documentElement.dataset.theme = skinDef.themeMode;
     } else {
       document.documentElement.dataset.theme = state.mode || "light";
     }
-  }, [state.skin, state.mode, previewSkinId]);
+  }, [state.skin, state.mode, state.view, previewSkinId]);
 
   // Save state to localStorage
   useEffect(() => {
@@ -416,50 +421,64 @@ export function Calibr8Provider({ children }) {
     if (!skin) return false;
     const owned = state.ownedSkins || ["default"];
     const isOwned = owned.includes(skinId);
+    const isAuthenticated = Boolean(tokenStorage.get());
 
     if (!isOwned) {
-      if (state.coins < skin.price) {
-        showToast(`Not enough coins! This theme requires ${skin.price} coins.`);
+      if (!isAuthenticated) {
+        showToast("Sign in to purchase themes and save them to your account.");
         return false;
       }
 
-      // Try purchasing on backend if connected
-      if (tokenStorage.get()) {
-        try {
-          const res = await api.themes.buyTheme(skinId);
-          if (res?.coins !== undefined) {
+      try {
+        const res = await api.themes.buyTheme(skinId);
+        if (!res?.success || res.coins === undefined) {
+          throw new Error("The purchase was not confirmed by the server.");
+        }
+        setState((s) => ({
+          ...s,
+          coins: res.coins,
+          user: s.user ? { ...s.user, coins: res.coins } : s.user,
+          headerStats: res.stats || {
+            ...s.headerStats,
+            coins: res.coins,
+          },
+          rating: res.stats?.rating ?? s.rating,
+          score: res.stats?.scoreUnits ?? s.score,
+          streak: res.stats?.streak ?? s.streak,
+          ownedSkins: [...new Set([...(s.ownedSkins || []), skinId])],
+          skin: skinId,
+        }));
+        setPreviewSkinId(null);
+        showToast(`Purchased & applied ${skin.name} theme!`);
+        return true;
+      } catch (apiErr) {
+        if (apiErr.code === "ALREADY_OWNED") {
+          try {
+            await api.themes.applyTheme(skinId);
             setState((s) => ({
               ...s,
-              coins: res.coins,
-              ownedSkins: [...owned, skinId],
+              ownedSkins: [...new Set([...(s.ownedSkins || []), skinId])],
               skin: skinId,
             }));
             setPreviewSkinId(null);
-            showToast(`Purchased & applied ${skin.name} theme!`);
+            showToast(`Applied ${skin.name} theme.`);
             return true;
+          } catch (applyErr) {
+            showToast(applyErr.message || "Unable to apply this theme.");
+            return false;
           }
-        } catch (apiErr) {
-          console.warn("Backend theme buy fallback:", apiErr.message);
         }
+        showToast(apiErr.message || "Unable to purchase this theme.");
+        return false;
       }
-
-      // Local state fallback
-      setState((s) => ({
-        ...s,
-        coins: s.coins - skin.price,
-        ownedSkins: [...owned, skinId],
-        skin: skinId,
-      }));
-      setPreviewSkinId(null);
-      showToast(`Purchased & applied ${skin.name} theme!`);
-      return true;
     } else {
       // Apply theme
-      if (tokenStorage.get()) {
+      if (isAuthenticated) {
         try {
           await api.themes.applyTheme(skinId);
         } catch (apiErr) {
-          console.warn("Backend theme apply fallback:", apiErr.message);
+          showToast(apiErr.message || "Unable to apply this theme.");
+          return false;
         }
       }
 
