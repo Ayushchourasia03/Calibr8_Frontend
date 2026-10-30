@@ -14,7 +14,6 @@ export function useCalibr8State() {
       rating: 1630,
       streak: 46,
       calibrating: false,
-      freeDry: 3,
       theme: "default",
       owned: ["default"],
       board: "College",

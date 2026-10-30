@@ -139,7 +139,7 @@ export function LandingView() {
               <div className="card-step-badge">3</div>
               <h3 className="card-title">Learn the idea</h3>
               <p className="card-desc">
-                Concept videos, hints, a dry run and notes teach the thinking, not just the answer.
+                Concept videos, hints, sample runs and notes teach the thinking, not just the answer.
               </p>
             </div>
 
@@ -185,7 +185,7 @@ export function LandingView() {
             <div className="landing-card">
               <h3 className="card-title">Relaxed, 1.0x</h3>
               <p className="card-desc">
-                Hints, dry run, notes and paste allowed. Built for learning.
+                Hints, sample runs, notes and paste allowed. Built for learning.
               </p>
             </div>
 

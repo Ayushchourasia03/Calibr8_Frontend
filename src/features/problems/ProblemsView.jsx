@@ -1,27 +1,23 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import { TOPS, DIFFICULTY_LABELS } from "../../data/constants";
-import { PROBLEMS_CATALOG } from "../../data/problemsCatalog";
+import { DIFFICULTY_LABELS } from "../../data/constants";
+import { problemsApi } from "./problemsApi";
 
-const accFor = (q) => {
-  if (q.ac !== undefined) return q.ac;
-  const a = [
-    [55, 85],
-    [35, 60],
-    [18, 42],
-  ][q.l || 0];
-  const h =
-    [...(q.key || q.title || "x")].reduce(
-      (s, c) => (s * 31 + c.charCodeAt(0)) >>> 0,
-      7
-    ) / 4294967296;
-  return Math.round((a[0] + h * (a[1] - a[0])) * 10) / 10;
+const difficultyIndex = (difficulty) => {
+  const normalized = String(difficulty || "").toLowerCase();
+  const index = DIFFICULTY_LABELS.findIndex(
+    (label) => label.toLowerCase() === (normalized === "mid" ? "medium" : normalized)
+  );
+  return index < 0 ? 0 : index;
 };
 
 export function ProblemsView() {
   const { state, setView, openProblemInSolver } = useCalibr8();
 
   const query = state.searchQuery || "";
+  const [problems, setProblems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [selectedDifficulty, setSelectedDifficulty] = useState(-1);
   const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
@@ -29,8 +25,48 @@ export function ProblemsView() {
   const [page, setPage] = useState(0);
 
   const PAGE_SIZE = 25;
-  const userSolvedMap = useMemo(() => state.solved || {}, [state.solved]);
   const userLevels = useMemo(() => state.levels || {}, [state.levels]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    problemsApi
+      .getAll({ signal: controller.signal })
+      .then((response) => {
+        if (!Array.isArray(response?.data)) {
+          throw new Error("The problems API returned an invalid catalog.");
+        }
+        setProblems(response.data);
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          setLoadError(error.message || "Unable to load problems.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const catalog = useMemo(
+    () =>
+      problems.map((problem) => ({
+        ...problem,
+        id: problem.problemNumber,
+        t: problem.topic || "Other",
+        l: difficultyIndex(problem.difficulty),
+        ac: problem.acceptanceRate,
+        pts: problem.points,
+      })),
+    [problems]
+  );
+
+  const topics = useMemo(
+    () => [...new Set(catalog.map((problem) => problem.t))].sort((a, b) => a.localeCompare(b)),
+    [catalog]
+  );
 
   const spot = (t) => {
     if (!(t in userLevels)) return "n";
@@ -43,51 +79,45 @@ export function ProblemsView() {
   const dotTitle = (s) =>
     s === "g" ? "Good" : s === "b" ? "Better" : s === "w" ? "Weak" : "Not started";
 
-  // Difficulty counts across catalog
   const { cnt, sd } = useMemo(() => {
     const total = [0, 0, 0];
     const solved = [0, 0, 0];
-    PROBLEMS_CATALOG.forEach((c) => {
+    catalog.forEach((c) => {
       total[c.l]++;
-      if (userSolvedMap[c.id]) solved[c.l]++;
+      if (c.isSolved) solved[c.l]++;
     });
     return { cnt: total, sd: solved };
-  }, [userSolvedMap]);
+  }, [catalog]);
 
-  // Topic counts across catalog
   const topicCounts = useMemo(() => {
     const map = {};
-    TOPS.forEach((t) => (map[t] = 0));
-    PROBLEMS_CATALOG.forEach((c) => {
+    catalog.forEach((c) => {
       map[c.t] = (map[c.t] || 0) + 1;
     });
     return map;
-  }, []);
+  }, [catalog]);
 
-  // Filter & sort problems
   const filteredProblems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const rr = (t) => state.ratings?.[t] ?? state.rating ?? 1200;
-    const sc = (c) =>
-      Math.abs(c.d - (rr(c.t) - 147)) +
-      (c.t in userLevels ? 0 : 200) +
-      (userSolvedMap[c.id] ? 5000 : 0);
+    const recommendationScore = (problem) => {
+      const rating = state.ratings?.[problem.t] ?? state.rating ?? 1200;
+      const targetDifficulty = rating < 1000 ? 0 : rating < 1400 ? 1 : 2;
+      return (
+        Math.abs(problem.l - targetDifficulty) +
+        (problem.t in userLevels ? 0 : 1) +
+        (problem.isSolved ? 3 : 0)
+      );
+    };
 
-    const res = PROBLEMS_CATALOG.filter((c) => {
+    const res = catalog.filter((c) => {
       if (selectedDifficulty >= 0 && c.l !== selectedDifficulty) return false;
       if (selectedTopic && c.t !== selectedTopic) return false;
-      if (selectedStatus === "solved" && !userSolvedMap[c.id]) return false;
-      if (selectedStatus === "todo" && userSolvedMap[c.id]) return false;
+      if (selectedStatus === "solved" && !c.isSolved) return false;
+      if (selectedStatus === "todo" && c.isSolved) return false;
       if (
         q &&
         !(
-          c.title +
-          " " +
-          c.t +
-          " " +
-          DIFFICULTY_LABELS[c.l] +
-          " #" +
-          c.id
+          `${c.title} ${c.slug} ${c.t} ${c.difficulty} ${(c.tags || []).join(" ")} #${c.id}`
         )
           .toLowerCase()
           .includes(q)
@@ -100,15 +130,13 @@ export function ProblemsView() {
     res.sort((x, y) => {
       switch (selectedSort) {
         case "rec":
-          return sc(x) - sc(y);
+          return recommendationScore(x) - recommendationScore(y) || x.id - y.id;
         case "acd":
-          return y.ac - x.ac;
+          return (y.ac ?? -1) - (x.ac ?? -1);
         case "aca":
-          return x.ac - y.ac;
+          return (x.ac ?? Number.POSITIVE_INFINITY) - (y.ac ?? Number.POSITIVE_INFINITY);
         case "pts":
           return y.pts - x.pts || x.id - y.id;
-        case "new":
-          return y.id - x.id;
         case "id":
         default:
           return x.id - y.id;
@@ -117,12 +145,12 @@ export function ProblemsView() {
 
     return res;
   }, [
+    catalog,
     query,
     selectedDifficulty,
     selectedTopic,
     selectedStatus,
     selectedSort,
-    userSolvedMap,
     userLevels,
     state.ratings,
     state.rating,
@@ -134,8 +162,6 @@ export function ProblemsView() {
     currentPage * PAGE_SIZE,
     currentPage * PAGE_SIZE + PAGE_SIZE
   );
-
-  const pin = state.dailyDone ? state.stretch : state.daily;
 
   const handleDifficultyClick = (lvl) => {
     setSelectedDifficulty((prev) => (prev === lvl ? -1 : lvl));
@@ -151,7 +177,7 @@ export function ProblemsView() {
     <div>
       <h1>Problems</h1>
       <p className="mu">
-        Catalog preview: 5,000 slots across {TOPS.length} topics. Titles are placeholders until the real, original problems are written.
+        Browse {catalog.length.toLocaleString()} problems from the backend catalog.
       </p>
 
       <div className="pgrid">
@@ -179,7 +205,7 @@ export function ProblemsView() {
           <div className="card">
             <h3>Topics</h3>
             <div style={{ maxHeight: "340px", overflow: "auto" }}>
-              {TOPS.map((t) => {
+              {topics.map((t) => {
                 const sp = spot(t);
                 const isSelected = selectedTopic === t;
                 return (
@@ -231,7 +257,7 @@ export function ProblemsView() {
               }}
             >
               <option value="">All topics</option>
-              {TOPS.map((t) => (
+              {topics.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
@@ -283,39 +309,18 @@ export function ProblemsView() {
                 </tr>
               </thead>
               <tbody>
-                {pin && currentPage === 0 && !query.trim() && (
-                  <tr
-                    className="pinr"
-                    data-pin="1"
-                    onClick={() => openProblemInSolver(pin)}
-                  >
-                    <td>★</td>
-                    <td>
-                      <b>{pin.title}</b>{" "}
-                      <span className="tag" style={{ color: "#FFB020" }}>
-                        {state.dailyDone ? "Stretch" : "Today"}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="tag">{pin.topic}</span>
-                    </td>
-                    <td>
-                      <span className={`dc d${"EMH"[pin.l]}`}>
-                        {DIFFICULTY_LABELS[pin.l]}
-                      </span>
-                    </td>
-                    <td>{accFor(pin)}%</td>
-                    <td>{pin.pts}</td>
-                    <td className="mu">
-                      {state.dailyDone ? "Open" : "Strict only"}
-                    </td>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="mu">Loading problems…</td>
                   </tr>
-                )}
-
-                {rows.length > 0 ? (
+                ) : loadError ? (
+                  <tr>
+                    <td colSpan={7} role="alert">{loadError}</td>
+                  </tr>
+                ) : rows.length > 0 ? (
                   rows.map((c) => (
                     <tr
-                      key={c.id}
+                      key={c.slug}
                       data-id={c.id}
                       onClick={() => openProblemInSolver(c)}
                     >
@@ -329,13 +334,13 @@ export function ProblemsView() {
                           {DIFFICULTY_LABELS[c.l]}
                         </span>
                       </td>
-                      <td>{c.ac}%</td>
+                      <td>{c.ac == null ? "—" : `${c.ac}%`}</td>
                       <td>{c.pts}</td>
                       <td>
-                        {userSolvedMap[c.id] ? (
+                        {c.isSolved ? (
                           <span className="ok">Solved</span>
                         ) : (
-                          "-"
+                          <span className="mu">Unsolved</span>
                         )}
                       </td>
                     </tr>
@@ -355,7 +360,7 @@ export function ProblemsView() {
             <button
               className="btn ghost"
               id="pp"
-              disabled={currentPage === 0}
+              disabled={currentPage === 0 || loading || Boolean(loadError)}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
               Previous
@@ -367,7 +372,7 @@ export function ProblemsView() {
             <button
               className="btn ghost"
               id="pn"
-              disabled={currentPage >= totalPages - 1}
+              disabled={currentPage >= totalPages - 1 || loading || Boolean(loadError)}
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             >
               Next

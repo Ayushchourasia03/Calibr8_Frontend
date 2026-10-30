@@ -1,465 +1,372 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
+import { studyApi } from "./studyApi";
 import { useCalibr8 } from "../../context/Calibr8Context";
-import {
-  CURRICULUM,
-  STUDY_SHEETS,
-  QUESTION_BANKS,
-} from "../../data/curriculumData";
+
+function StudyContent({ content }) {
+  const lines = (content || "").split(/\r?\n/);
+  const blocks = [];
+  let codeLines = [];
+  let inCode = false;
+
+  lines.forEach((line, index) => {
+    if (line.trim().startsWith("```")) {
+      if (inCode) {
+        blocks.push(
+          <pre key={`code-${index}`} className="card">
+            <code>{codeLines.join("\n")}</code>
+          </pre>,
+        );
+        codeLines = [];
+      }
+      inCode = !inCode;
+      return;
+    }
+    if (inCode) {
+      codeLines.push(line);
+    } else if (line.startsWith("# ")) {
+      blocks.push(<h3 key={index}>{line.slice(2)}</h3>);
+    } else if (line.startsWith("## ")) {
+      blocks.push(<h4 key={index}>{line.slice(3)}</h4>);
+    } else if (line.startsWith("### ")) {
+      blocks.push(<h4 key={index}>{line.slice(4)}</h4>);
+    } else if (/^\s*[-*]\s/.test(line)) {
+      blocks.push(
+        <p key={index} className="mu">
+          • {line.replace(/^\s*[-*]\s/, "")}
+        </p>,
+      );
+    } else if (line.trim() && !/^---+$/.test(line.trim())) {
+      blocks.push(
+        <p key={index} style={{ whiteSpace: "pre-wrap" }}>
+          {line}
+        </p>,
+      );
+    }
+  });
+
+  if (codeLines.length) {
+    blocks.push(
+      <pre key="code-end" className="card">
+        <code>{codeLines.join("\n")}</code>
+      </pre>,
+    );
+  }
+  return <div className="space-y-2">{blocks}</div>;
+}
 
 export function LibraryView() {
-  const { state, setState, setActiveModal, setModalData } = useCalibr8();
+  const { state, setState } = useCalibr8();
+  const [subjects, setSubjects] = useState([]);
+  const [subject, setSubject] = useState(null);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [subjectRetry, setSubjectRetry] = useState(0);
+  const [loadingSubject, setLoadingSubject] = useState(() =>
+    Boolean(state.librarySubjectSlug),
+  );
+  const [subjectReload, setSubjectReload] = useState(0);
+  const [error, setError] = useState("");
+  const [openChapter, setOpenChapter] = useState(null);
+  const [chapterTopics, setChapterTopics] = useState({});
+  const [loadingChapter, setLoadingChapter] = useState(null);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [loadingTopic, setLoadingTopic] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [quizResult, setQuizResult] = useState(null);
+  const [submittingQuiz, setSubmittingQuiz] = useState(false);
+  const [quizError, setQuizError] = useState("");
 
-  const [activeCatIndex, setActiveCatIndex] = useState(state.libCat || 0);
-
-  // Daily question interaction state
-  const [dailySelected, setDailySelected] = useState(null);
-
-  // Practice quiz modal state
-  const [activeQuiz, setActiveQuiz] = useState(null); // { title, list, currentIdx, score, selectedIdx, showExplanation }
-
-  // Study sheet modal state
-  const [studySheetModal, setStudySheetModal] = useState(null); // { topic, lessons, sheet }
-
-  const activeCategory =
-    CURRICULUM[Math.min(activeCatIndex, CURRICULUM.length - 1)];
-  const [categoryName, , topicGroups] = activeCategory;
-
-  // Calculate total lessons and completed lessons across entire library
-  const { totalLessons, completedLessons } = useMemo(() => {
-    let total = 0;
-    CURRICULUM.forEach((cat) => {
-      cat[2].forEach((tg) => {
-        total += tg[1].length;
+  useEffect(() => {
+    let active = true;
+    studyApi
+      .getSubjects()
+      .then((result) => {
+        if (!active) return;
+        if (!Array.isArray(result)) {
+          throw new Error("The study subjects response was invalid.");
+        }
+        setSubjects(result);
+        setError("");
+      })
+      .catch((err) => {
+        if (active) setError(err.message || "Could not load study subjects.");
+      })
+      .finally(() => {
+        if (active) setLoadingSubjects(false);
       });
-    });
-    const done = Object.values(state.lib || {}).filter(Boolean).length;
-    return { totalLessons: total, completedLessons: done };
-  }, [state.lib]);
+    return () => {
+      active = false;
+    };
+  }, [subjectRetry]);
 
-  const [now] = useState(() => Date.now());
+  useEffect(() => {
+    if (!state.librarySubjectSlug) return undefined;
+    let active = true;
+    studyApi
+      .getSubject(state.librarySubjectSlug)
+      .then((result) => {
+        if (active) {
+          setSubject(result);
+          setError("");
+        }
+      })
+      .catch((err) => {
+        if (active) setError(err.message || "Could not load this subject.");
+      })
+      .finally(() => {
+        if (active) setLoadingSubject(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [state.librarySubjectSlug, subjectReload]);
 
-  // Question bank for current category (e.g., Aptitude, English)
-  const categoryBank = useMemo(() => {
-    return QUESTION_BANKS.filter((q) => q[0] === categoryName);
-  }, [categoryName]);
-
-  // Daily question from bank based on current date
-  const dailyQuestion = useMemo(() => {
-    if (!categoryBank.length) return null;
-    const dayIndex = Math.floor(now / 864e5) % categoryBank.length;
-    return categoryBank[dayIndex];
-  }, [categoryBank, now]);
-
-  // Toggle lesson checkbox
-  const handleLessonToggle = (catName, topicName, lessonName) => {
-    const key = `${catName}|${topicName}|${lessonName}`;
-    const currentVal = !!(state.lib || {})[key];
-    setState((s) => ({
-      ...s,
-      lib: {
-        ...(s.lib || {}),
-        [key]: currentVal ? 0 : 1,
-      },
-    }));
+  const selectSubject = (slug) => {
+    setLoadingSubject(true);
+    setError("");
+    setSubject(null);
+    setState((current) => ({ ...current, librarySubjectSlug: slug }));
+    setSubjectReload((current) => current + 1);
+    setOpenChapter(null);
+    setChapterTopics({});
   };
 
-  // Open study sheet modal
-  const openStudySheet = (topicName, lessons) => {
-    const sheet =
-      STUDY_SHEETS[topicName] || ["Notes for this topic are coming soon."];
-    setStudySheetModal({
-      topic: topicName,
-      lessons,
-      sheet,
-    });
+  const toggleChapter = async (chapter) => {
+    if (openChapter === chapter.id) {
+      setOpenChapter(null);
+      return;
+    }
+    setOpenChapter(chapter.id);
+    if (chapterTopics[chapter.id]) return;
+
+    setLoadingChapter(chapter.id);
+    setError("");
+    try {
+      const result = await studyApi.getChapterTopics(chapter.id);
+      if (!Array.isArray(result)) {
+        throw new Error("The chapter topics response was invalid.");
+      }
+      setChapterTopics((current) => ({ ...current, [chapter.id]: result }));
+    } catch (err) {
+      setError(err.message || "Could not load chapter topics.");
+    } finally {
+      setLoadingChapter(null);
+    }
   };
 
-  // Open video modal
-  const openVideo = (topicName) => {
-    setActiveModal("video");
-    setModalData({ topic: topicName });
+  const openTopic = async (topic) => {
+    setLoadingTopic(true);
+    setError("");
+    setSelectedTopic(null);
+    setAnswers({});
+    setQuizResult(null);
+    setQuizError("");
+    try {
+      const result = await studyApi.getTopicDetail(topic.slug);
+      setSelectedTopic(result);
+    } catch (err) {
+      setError(err.message || "Could not load this study material.");
+    } finally {
+      setLoadingTopic(false);
+    }
   };
 
-  // Start practice quiz
-  const startQuiz = (list, title) => {
-    setActiveQuiz({
-      title,
-      list,
-      currentIdx: 0,
-      score: 0,
-      selectedIdx: null,
-      showExplanation: false,
-    });
+  const submitQuiz = async () => {
+    if (!selectedTopic) return;
+    setSubmittingQuiz(true);
+    setQuizError("");
+    try {
+      const result = await studyApi.submitQuiz(selectedTopic.slug, answers);
+      setQuizResult(result);
+    } catch (err) {
+      setQuizError(err.message || "Could not submit the quiz.");
+    } finally {
+      setSubmittingQuiz(false);
+    }
   };
 
-  // Handle quiz option selection
-  const handleQuizAnswer = (optionIdx) => {
-    if (!activeQuiz || activeQuiz.showExplanation) return;
-    const currentQ = activeQuiz.list[activeQuiz.currentIdx];
-    const isCorrect = optionIdx === currentQ[3];
-
-    setActiveQuiz((prev) => ({
-      ...prev,
-      selectedIdx: optionIdx,
-      showExplanation: true,
-      score: isCorrect ? prev.score + 1 : prev.score,
-    }));
-  };
-
-  // Advance or finish quiz
-  const handleNextQuizQuestion = () => {
-    if (!activeQuiz) return;
-    setActiveQuiz((prev) => ({
-      ...prev,
-      currentIdx: prev.currentIdx + 1,
-      selectedIdx: null,
-      showExplanation: false,
-    }));
-  };
+  const quizResultById = new Map(
+    (quizResult?.result || []).map((item) => [item.mcqId, item]),
+  );
+  const mcqs = selectedTopic?.mcqs || [];
 
   return (
     <div>
       <h1>Library</h1>
       <p className="mu">
-        Every topic from the basics of DSA to core CS, aptitude, English, data
-        analytics, system design and AI in practice. Open a study sheet, tick
-        lessons as you finish them, and practise with the question banks.{" "}
-        {completedLessons} of {totalLessons} lessons done.
+        Browse backend study subjects, chapters, lessons, and practice questions.
       </p>
 
-      {/* Category Navigation Pills */}
-      <div className="row">
-        {CURRICULUM.map((cat, i) => (
+      {loadingSubjects && <p className="mu">Loading study subjects…</p>}
+      {error && (
+        <div className="card" role="alert">
+          <p>{error}</p>
           <button
-            key={cat[0]}
-            className={`pill ${i === activeCatIndex ? "on" : ""}`}
-            data-c={i}
+            className="btn ghost"
             onClick={() => {
-              setActiveCatIndex(i);
-              setDailySelected(null);
+              if (subject) {
+                selectSubject(subject.slug);
+              } else {
+                setLoadingSubjects(true);
+                setSubjectRetry((value) => value + 1);
+              }
             }}
           >
-            {cat[1]} {cat[0]}
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!loadingSubjects && subjects.length === 0 && !error && (
+        <p className="mu">No study subjects are available yet.</p>
+      )}
+
+      <div className="row">
+        {subjects.map((item) => (
+          <button
+            key={item.id}
+            className={`pill ${subject?.slug === item.slug ? "on" : ""}`}
+            onClick={() => selectSubject(item.slug)}
+          >
+            {item.icon ? `${item.icon} ` : ""}
+            {item.name}
           </button>
         ))}
       </div>
 
-      {/* Daily Question & Question Bank for categories with banks */}
-      {dailyQuestion && (
-        <div className="grid" style={{ marginBottom: "14px" }}>
-          <div className="card">
-            <h2>Daily {categoryName.toLowerCase()} question</h2>
-            <p>
-              <b>{dailyQuestion[1]}</b>
-            </p>
-            <div id="dqo">
-              {dailyQuestion[2].map((option, j) => {
-                const isSelected = dailySelected === j;
-                const isCorrect = j === dailyQuestion[3];
-                let borderColor = "";
-                if (dailySelected !== null) {
-                  borderColor = isCorrect
-                    ? "#2ED47A"
-                    : isSelected
-                    ? "#FF5C7A"
-                    : "";
-                }
-
-                return (
+      {loadingSubject && <p className="mu">Loading chapters…</p>}
+      {subject && (
+        <section>
+          <h2>{subject.name}</h2>
+          {subject.description && <p className="mu">{subject.description}</p>}
+          {subject.chapters?.length ? (
+            <div className="grid">
+              {subject.chapters.map((chapter) => (
+                <article className="card" key={chapter.id}>
                   <button
-                    key={j}
-                    className="btn ghost dqb"
-                    data-j={j}
-                    disabled={dailySelected !== null}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      margin: "5px 0",
-                      borderColor: borderColor || undefined,
-                    }}
-                    onClick={() => {
-                      setDailySelected(j);
-                      setState((s) => ({
-                        ...s,
-                        libDay: {
-                          ...(s.libDay || {}),
-                          [categoryName]: new Date().toISOString().slice(0, 10),
-                        },
-                      }));
-                    }}
+                    className="btn ghost"
+                    aria-expanded={openChapter === chapter.id}
+                    onClick={() => toggleChapter(chapter)}
                   >
-                    {option}
+                    {openChapter === chapter.id ? "−" : "+"} {chapter.name}
+                    {chapter._count?.topics != null
+                      ? ` · ${chapter._count.topics} topics`
+                      : ""}
                   </button>
-                );
-              })}
-            </div>
-
-            {dailySelected !== null && (
-              <div id="dqe">
-                <p className={dailySelected === dailyQuestion[3] ? "ok" : ""}>
-                  <b>
-                    {dailySelected === dailyQuestion[3]
-                      ? "Correct."
-                      : "Not quite."}
-                  </b>{" "}
-                  {dailyQuestion[4]}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            <h2>{categoryName} question bank</h2>
-            <p className="mu">
-              {categoryBank.length} questions with explanations. You see the
-              answer and the reasoning right after each one.
-            </p>
-            <button
-              className="btn"
-              id="qbank"
-              onClick={() =>
-                startQuiz(categoryBank, `${categoryName} question bank`)
-              }
-            >
-              Start practice quiz
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Topics Grid */}
-      <div className="grid lib">
-        {topicGroups.map(([topicName, lessons]) => {
-          const completedInTopic = lessons.filter(
-            (l) => (state.lib || {})[`${categoryName}|${topicName}|${l}`]
-          ).length;
-          const pct = lessons.length
-            ? (completedInTopic / lessons.length) * 100
-            : 0;
-
-          return (
-            <div key={topicName} className="card">
-              <h3>{topicName}</h3>
-              <div className="bar">
-                <i style={{ width: `${pct}%` }}></i>
-              </div>
-              <p className="mu lc">
-                {completedInTopic} of {lessons.length} lessons
-              </p>
-
-              <details>
-                <summary>Lessons</summary>
-                {lessons.map((lesson) => {
-                  const isChecked =
-                    !!(state.lib || {})[
-                      `${categoryName}|${topicName}|${lesson}`
-                    ];
-                  return (
-                    <label
-                      key={lesson}
-                      className="tr"
-                      style={{ cursor: "pointer" }}
-                    >
-                      <span>{lesson}</span>
-                      <input
-                        type="checkbox"
-                        className="lk"
-                        checked={isChecked}
-                        onChange={() =>
-                          handleLessonToggle(
-                            categoryName,
-                            topicName,
-                            lesson
-                          )
-                        }
-                      />
-                    </label>
-                  );
-                })}
-              </details>
-
-              <div className="row">
-                <button
-                  className="btn ghost shb"
-                  data-t={topicName}
-                  data-c={activeCatIndex}
-                  onClick={() => openStudySheet(topicName, lessons)}
-                >
-                  📄 Study sheet
-                </button>
-                <button
-                  className="btn ghost vid2"
-                  data-t={topicName}
-                  onClick={() => openVideo(topicName)}
-                >
-                  🎬 Video{state.videos?.[topicName] ? " ✓" : ""}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Practice Quiz Modal */}
-      {activeQuiz && (
-        <div
-          className="modal"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target.classList.contains("modal")) setActiveQuiz(null);
-          }}
-        >
-          <div className="sheet">
-            <button
-              className="x"
-              aria-label="Close"
-              onClick={() => setActiveQuiz(null)}
-            >
-              &times;
-            </button>
-            <h2>{activeQuiz.title}</h2>
-            <div id="qz">
-              {activeQuiz.currentIdx >= activeQuiz.list.length ? (
-                <div>
-                  <p className="big" style={{ fontSize: "36px" }}>
-                    {activeQuiz.score} / {activeQuiz.list.length}
-                  </p>
-                  <p className="mu">
-                    {activeQuiz.score >= activeQuiz.list.length * 0.8
-                      ? "Excellent work."
-                      : activeQuiz.score >= activeQuiz.list.length * 0.5
-                      ? "Good. Read the explanations and try again."
-                      : "Keep practising. Read the study sheet and retry."}
-                  </p>
-                  <button
-                    className="btn"
-                    id="qa"
-                    onClick={() =>
-                      setActiveQuiz((prev) => ({
-                        ...prev,
-                        currentIdx: 0,
-                        score: 0,
-                        selectedIdx: null,
-                        showExplanation: false,
-                      }))
-                    }
-                  >
-                    Try again
-                  </button>
-                </div>
-              ) : (
-                (() => {
-                  const q = activeQuiz.list[activeQuiz.currentIdx];
-                  return (
-                    <div>
-                      <p className="mu">
-                        Question {activeQuiz.currentIdx + 1} of{" "}
-                        {activeQuiz.list.length}
-                      </p>
-                      <p>
-                        <b>{q[1]}</b>
-                      </p>
-                      {q[2].map((option, j) => {
-                        let borderColor = "";
-                        if (activeQuiz.showExplanation) {
-                          borderColor =
-                            j === q[3]
-                              ? "#2ED47A"
-                              : j === activeQuiz.selectedIdx
-                              ? "#FF5C7A"
-                              : "";
-                        }
-                        return (
-                          <button
-                            key={j}
-                            className="btn ghost qo"
-                            data-j={j}
-                            disabled={activeQuiz.showExplanation}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              textAlign: "left",
-                              margin: "6px 0",
-                              borderColor: borderColor || undefined,
-                            }}
-                            onClick={() => handleQuizAnswer(j)}
-                          >
-                            {option}
-                          </button>
-                        );
-                      })}
-                      {activeQuiz.showExplanation && (
-                        <div id="qe">
-                          <p
-                            className={
-                              activeQuiz.selectedIdx === q[3] ? "ok" : ""
-                            }
-                          >
-                            <b>
-                              {activeQuiz.selectedIdx === q[3]
-                                ? "Correct."
-                                : "Not quite."}
-                            </b>{" "}
-                            {q[4]}
-                          </p>
-                          <button
-                            className="btn"
-                            id="qn"
-                            onClick={handleNextQuizQuestion}
-                          >
-                            {activeQuiz.currentIdx + 1 < activeQuiz.list.length
-                              ? "Next"
-                              : "Finish"}
-                          </button>
-                        </div>
+                  {openChapter === chapter.id && (
+                    <div className="space-y-2" style={{ marginTop: 12 }}>
+                      {loadingChapter === chapter.id && (
+                        <p className="mu">Loading topics…</p>
+                      )}
+                      {(chapterTopics[chapter.id] || []).map((topic) => (
+                        <button
+                          key={topic.id}
+                          className="btn ghost"
+                          style={{ display: "block", width: "100%", textAlign: "left" }}
+                          onClick={() => openTopic(topic)}
+                        >
+                          {topic.name}
+                        </button>
+                      ))}
+                      {chapterTopics[chapter.id]?.length === 0 && (
+                        <p className="mu">No topics in this chapter yet.</p>
                       )}
                     </div>
-                  );
-                })()
-              )}
+                  )}
+                </article>
+              ))}
             </div>
-          </div>
-        </div>
+          ) : (
+            <p className="mu">This subject has no chapters yet.</p>
+          )}
+        </section>
       )}
 
-      {/* Study Sheet Modal */}
-      {studySheetModal && (
+      {loadingTopic && <p className="mu">Loading study material…</p>}
+      {selectedTopic && (
         <div
           className="modal"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target.classList.contains("modal")) setStudySheetModal(null);
+          role="presentation"
+          onClick={(event) => {
+            if (event.target.classList.contains("modal")) setSelectedTopic(null);
           }}
         >
-          <div className="sheet">
+          <section className="sheet" role="dialog" aria-modal="true">
             <button
               className="x"
-              aria-label="Close"
-              onClick={() => setStudySheetModal(null)}
+              aria-label="Close study material"
+              onClick={() => setSelectedTopic(null)}
             >
               &times;
             </button>
-            <h2>{studySheetModal.topic}: study sheet</h2>
-            <p className="mu">Key points to remember.</p>
-            <ul className="shl">
-              {studySheetModal.sheet.map((x, idx) => (
-                <li key={idx}>{x}</li>
-              ))}
-            </ul>
-            <h3>Lessons in this topic</h3>
-            <ul className="shl">
-              {studySheetModal.lessons.map((lesson, idx) => (
-                <li key={idx}>{lesson}</li>
-              ))}
-            </ul>
-            <p className="mu">
-              Tip: when Calibr8 is open in its own tab, your browser&apos;s print
-              option can save this page as a PDF.
-            </p>
-          </div>
+            <h2>{selectedTopic.name}</h2>
+            <StudyContent content={selectedTopic.content} />
+
+            {mcqs.length > 0 && (
+              <section>
+                <h3>Practice questions</h3>
+                {mcqs.map((mcq) => {
+                  const result = quizResultById.get(mcq.id);
+                  return (
+                    <fieldset className="card" key={mcq.id}>
+                      <legend>{mcq.question}</legend>
+                      {(mcq.options || []).map((option, index) => (
+                        <label
+                          key={index}
+                          className="tr"
+                          style={{
+                            borderColor:
+                              result?.correctIndex === index
+                                ? "#2ED47A"
+                                : result && answers[mcq.id] === index
+                                  ? "#FF5C7A"
+                                  : undefined,
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name={mcq.id}
+                            checked={answers[mcq.id] === index}
+                            disabled={Boolean(quizResult)}
+                            onChange={() =>
+                              setAnswers((current) => ({
+                                ...current,
+                                [mcq.id]: index,
+                              }))
+                            }
+                          />
+                          {option}
+                        </label>
+                      ))}
+                      {result && (
+                        <p className={result.isCorrect ? "ok" : "mu"}>
+                          {result.isCorrect ? "Correct. " : "Incorrect. "}
+                          {result.explanation}
+                        </p>
+                      )}
+                    </fieldset>
+                  );
+                })}
+                {quizError && <p role="alert">{quizError}</p>}
+                {quizResult ? (
+                  <p className="ok">
+                    Score: {quizResult.score} / {quizResult.total}
+                  </p>
+                ) : (
+                  <button
+                    className="btn"
+                    disabled={
+                      submittingQuiz ||
+                      mcqs.length === 0 ||
+                      Object.keys(answers).length !== mcqs.length
+                    }
+                    onClick={submitQuiz}
+                  >
+                    {submittingQuiz ? "Submitting…" : "Submit answers"}
+                  </button>
+                )}
+              </section>
+            )}
+          </section>
         </div>
       )}
     </div>
