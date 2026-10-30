@@ -22,18 +22,25 @@ const ONBOARD_LANGS = [
 ];
 
 export function OnboardingModal() {
-  const { state, setState, activeModal, setActiveModal, modalData, showToast } =
-    useCalibr8();
+  const {
+    state,
+    setState,
+    activeModal,
+    setActiveModal,
+    modalData,
+    setModalData,
+    setView,
+    showToast,
+  } = useCalibr8();
 
   const isOpen = activeModal === "onboarding";
 
-  const [step, setStep] = useState(() => {
-    if (modalData?.step !== undefined) return modalData.step;
-    return 0;
-  });
-  const [authMode, setAuthMode] = useState(
-    () => modalData?.authMode || "login",
-  );
+  const step = modalData?.step ?? 0;
+  const setStep = (nextStep) =>
+    setModalData((current) => ({ ...current, step: nextStep }));
+  const authMode = modalData?.authMode || "login";
+  const setAuthMode = (nextAuthMode) =>
+    setModalData((current) => ({ ...current, authMode: nextAuthMode }));
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -86,6 +93,7 @@ export function OnboardingModal() {
   const close = () => {
     setSelectedTopics(new Set());
     setActiveModal(null);
+    setModalData(null);
     setError("");
   };
 
@@ -122,8 +130,10 @@ export function OnboardingModal() {
 
     setLoading(true);
     try {
+      let isNewUser;
       if (authMode === "login") {
         const res = await authApi.login({ email: cleanEmail, password });
+        isNewUser = res.isNewUser ?? false;
         if (res?.user) {
           setState((s) => ({
             ...s,
@@ -138,6 +148,7 @@ export function OnboardingModal() {
           email: cleanEmail,
           password,
         });
+        isNewUser = res.isNewUser ?? true;
         if (res?.user) {
           setState((s) => ({
             ...s,
@@ -148,6 +159,12 @@ export function OnboardingModal() {
         showToast("Account created successfully.");
       }
       setError("");
+      if (!isNewUser) {
+        setView("home");
+        close();
+        return;
+      }
+
       setTopicsLoading(true);
       setStep(1); // Proceed to Step 2 (DSA Topic Calibration)
     } catch (err) {
@@ -441,7 +458,7 @@ export function OnboardingModal() {
                 {loading
                   ? "Processing..."
                   : authMode === "login"
-                    ? "Sign In & Continue"
+                    ? "Sign In"
                     : "Create Account & Continue"}
               </button>
             </form>

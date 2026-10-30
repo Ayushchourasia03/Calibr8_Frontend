@@ -1,10 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useEffect, useCallback } from "react";
-import {
-  DEFAULT_QUESTION,
-  BANK,
-  DIFFICULTY_LABELS,
-} from "../data/constants";
+import { DEFAULT_QUESTION, BANK, DIFFICULTY_LABELS } from "../data/constants";
 import { SKINS } from "../data/themesData";
 import { getTierInfo } from "../utils/tierUtils";
 import {
@@ -43,10 +39,11 @@ export function Calibr8Provider({ children }) {
     const hasAuthToken = Boolean(tokenStorage.get());
     const initial = {
       view: hasAuthToken ? viewFromPath(window.location.pathname) : "landing",
-      coins: 340,
-      score: 1630,
-      rating: 1630,
-      streak: 46,
+      coins: 100,
+      score: 0,
+      rating: 800,
+      streak: 0,
+      headerStats: null,
       calibrating: false,
       theme: "default",
       skin: "default",
@@ -116,6 +113,7 @@ export function Calibr8Provider({ children }) {
               : "landing",
           user: hasAuthToken || parsed.user?.guest ? parsed.user : null,
           mode: parsed.modePreferenceSet ? parsed.mode : "light",
+          headerStats: hasAuthToken ? null : parsed.headerStats ?? null,
         };
       }
     } catch {
@@ -209,7 +207,10 @@ export function Calibr8Provider({ children }) {
       } catch (err) {
         if (isMounted) {
           setBackendConnected(false);
-          console.warn("[Calibr8] Backend at localhost:3000 not reachable:", err.message);
+          console.warn(
+            "[Calibr8] Backend at localhost:3000 not reachable:",
+            err.message,
+          );
         }
       }
 
@@ -224,12 +225,13 @@ export function Calibr8Provider({ children }) {
           setState((s) => ({
             ...s,
             user: u,
+            headerStats: authRes.stats || null,
             name: u.name || s.name,
             college: u.college || s.college,
-            rating: u.rating ?? s.rating,
-            score: u.score ?? s.score,
-            streak: u.streak ?? s.streak,
-            coins: u.coins ?? s.coins,
+            rating: authRes.stats?.rating ?? u.rating ?? s.rating,
+            score: authRes.stats?.scoreUnits ?? u.score ?? s.score,
+            streak: authRes.stats?.streak ?? u.streak ?? s.streak,
+            coins: authRes.stats?.coins ?? u.coins ?? s.coins,
             started: u.onboarded || s.started,
           }));
 
@@ -284,7 +286,9 @@ export function Calibr8Provider({ children }) {
   }, []);
 
   const getTopicRating = (topic) => {
-    return state.ratings?.[topic] ?? [800, 1200, 1600][state.levels?.[topic] || 0];
+    return (
+      state.ratings?.[topic] ?? [800, 1200, 1600][state.levels?.[topic] || 0]
+    );
   };
 
   const getOverallRating = () => {
@@ -297,9 +301,10 @@ export function Calibr8Provider({ children }) {
   const createQuestion = (isStretch = false) => {
     const L = state.levels || { Arrays: 1 };
     const ts = Object.keys(L).sort(
-      (a, b) => getTopicRating(a) - getTopicRating(b)
+      (a, b) => getTopicRating(a) - getTopicRating(b),
     );
-    const topic = ts[(isStretch ? (state.stretchN || 0) + 1 : 0) % ts.length] || "Arrays";
+    const topic =
+      ts[(isStretch ? (state.stretchN || 0) + 1 : 0) % ts.length] || "Arrays";
     const lvl = L[topic] ?? 1;
     const b = BANK[topic] || ["Challenge", "Solve the challenge problem."];
     const isSw = topic === "Sliding Window";
@@ -324,9 +329,7 @@ export function Calibr8Provider({ children }) {
             "Name the pattern that keeps that information cheaply.",
             "Outline: set up, loop once, update the answer, return it.",
           ],
-      trace: isSw
-        ? DEFAULT_QUESTION.trace
-        : [["Ready", "[]", "0", "0", "0"]],
+      trace: isSw ? DEFAULT_QUESTION.trace : [["Ready", "[]", "0", "0", "0"]],
       stretch: Boolean(isStretch),
     };
   };
@@ -368,7 +371,9 @@ export function Calibr8Provider({ children }) {
 
       const keys = Object.keys(nextRatings);
       const nextOverall = keys.length
-        ? Math.round(keys.reduce((acc, k) => acc + nextRatings[k], 0) / keys.length)
+        ? Math.round(
+            keys.reduce((acc, k) => acc + nextRatings[k], 0) / keys.length,
+          )
         : s.rating || 1200;
 
       return {
@@ -502,7 +507,8 @@ export function Calibr8Provider({ children }) {
           ...questionData,
           title: d.title ? `${d.title} (${d.difficulty})` : questionData.title,
           text: d.description || questionData.text,
-          difficulty: d.difficulty === "Easy" ? 0 : d.difficulty === "Hard" ? 2 : 1,
+          difficulty:
+            d.difficulty === "Easy" ? 0 : d.difficulty === "Hard" ? 2 : 1,
           testcases: d.testcases || [],
           templates: d.templates || {},
         };
@@ -524,30 +530,32 @@ export function Calibr8Provider({ children }) {
       setState((s) => ({
         ...s,
         user: u,
+        headerStats: res.stats || null,
         name: u.name || s.name,
         college: u.college || s.college,
-        rating: u.rating ?? s.rating,
-        score: u.score ?? s.score,
-        streak: u.streak ?? s.streak,
-        coins: u.coins ?? s.coins,
+        rating: res.stats?.rating ?? u.rating ?? s.rating,
+        score: res.stats?.scoreUnits ?? u.score ?? s.score,
+        streak: res.stats?.streak ?? u.streak ?? s.streak,
+        coins: res.stats?.coins ?? u.coins ?? s.coins,
         started: u.onboarded || s.started,
       }));
     }
     return res;
   };
 
-  const register = async ({ name, email, password, role = "user" }) => {
-    const res = await api.auth.register({ name, email, password, role });
+  const register = async ({ name, email, password }) => {
+    const res = await api.auth.register({ name, email, password });
     if (res?.success && res.user) {
       const u = res.user;
       setState((s) => ({
         ...s,
         user: u,
+        headerStats: res.stats || null,
         name: u.name || s.name,
         college: u.college || s.college,
-        rating: u.rating ?? s.rating,
-        score: u.score ?? s.score,
-        coins: u.coins ?? s.coins,
+        rating: res.stats?.rating ?? u.rating ?? s.rating,
+        score: res.stats?.scoreUnits ?? u.score ?? s.score,
+        coins: res.stats?.coins ?? u.coins ?? s.coins,
         started: u.onboarded || s.started,
       }));
     }
@@ -689,7 +697,13 @@ export function Calibr8Provider({ children }) {
   };
 
   // Submit code for judging with backend polling (/api/execution/submissions)
-  const submitCode = async ({ slug, problemId, language, code, onProgress }) => {
+  const submitCode = async ({
+    slug,
+    problemId,
+    language,
+    code,
+    onProgress,
+  }) => {
     const submission = await api.execution.submit({
       slug,
       problemId,

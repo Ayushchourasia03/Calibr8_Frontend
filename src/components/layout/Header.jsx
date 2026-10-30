@@ -13,6 +13,7 @@ export function Header() {
     showToast,
     setCurrentQ,
     createQuestion,
+    logout,
   } = useCalibr8();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -79,6 +80,19 @@ export function Header() {
     (state.user && !state.user.guest
       ? state.user.email?.split("@")[0]
       : "Guest");
+  const isSignedIn = Boolean(state.user && !state.user.guest);
+  const headerStats = state.headerStats;
+  const tierLabel = state.calibrating
+    ? "Calibrating"
+    : headerStats?.tier || (isSignedIn ? "—" : tierInfo.full);
+  const scoreLabel =
+    isSignedIn && !headerStats
+      ? "—"
+      : Math.floor((state.score || 0) / 10).toLocaleString();
+  const coinsLabel =
+    isSignedIn && !headerStats ? "—" : state.coins || 0;
+  const streakLabel =
+    isSignedIn && !headerStats ? "—" : state.streak || 0;
 
   return (
     <header>
@@ -120,16 +134,17 @@ export function Header() {
 
         <div className="stats">
           <span className="stbtn" onClick={handleTierClick}>
-            Tier <b id="sTier">{state.calibrating ? "Calibrating" : tierInfo.full}</b>
+            Tier{" "}
+            <b id="sTier">{tierLabel}</b>
           </span>
           <span className="stbtn" onClick={() => handleStatClick("score")}>
-            Score <b id="sScore">{Math.floor((state.score || 0) / 10).toLocaleString()}</b>
+            Score <b id="sScore">{scoreLabel}</b>
           </span>
           <span className="stbtn" onClick={() => handleStatClick("coins")}>
-            Coins <b id="sCoins">{state.coins || 0}</b>
+            Coins <b id="sCoins">{coinsLabel}</b>
           </span>
           <span className="stbtn" onClick={() => handleStatClick("streak")}>
-            Streak <b id="sStreak">{state.streak || 0}d</b>
+            Streak <b id="sStreak">{streakLabel}d</b>
           </span>
         </div>
 
@@ -176,7 +191,7 @@ export function Header() {
               handleStatClick("score");
             }}
           >
-            Score <b>{Math.floor((state.score || 0) / 10).toLocaleString()}</b>
+            Score <b>{scoreLabel}</b>
           </button>
           <button
             onClick={() => {
@@ -184,7 +199,10 @@ export function Header() {
               handleTierClick();
             }}
           >
-            Tier <b>{state.calibrating ? "Calibrating" : tierInfo.full}</b>
+            Tier{" "}
+            <b>
+              {tierLabel}
+            </b>
           </button>
           <button
             onClick={() => {
@@ -212,6 +230,16 @@ export function Header() {
           >
             {state.user && !state.user.guest ? "Switch account" : "Log in"}
           </button>
+          {state.user && !state.user.guest && (
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                void logout();
+              }}
+            >
+              Log out
+            </button>
+          )}
         </div>
       )}
     </header>
