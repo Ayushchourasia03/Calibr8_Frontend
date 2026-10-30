@@ -21,7 +21,6 @@ export function SolveView() {
     setState,
     setActiveModal,
     setModalData,
-    getTopicRating,
     analyzeCode,
     showToast,
     runCode,
@@ -250,51 +249,37 @@ function getStarterTemplate(q, lang) {
       an = null;
     }
 
-    const t = 3;
-    const sm = 1;
-    const bonus = 10;
-
-    const share = [0, 0.3, 0.65, 1][t];
-    const mult = attempt.mode === "strict" ? 1.5 : 1.0;
-    const pen =
-      attempt.mode === "strict"
-        ? 0
-        : [0, 0.05, 0.15, 0.35][attempt.hints || 0];
-
-    const awardedPts = Math.max(
-      0,
-      Math.round((currentQ.pts * share * sm * mult - pen * currentQ.pts) * 10) /
-        10,
-    );
-    const prevBest = state.best?.[currentQ.key] || 0;
-    const delta = Math.max(0, Math.round((awardedPts - prevBest) * 10) / 10);
-    const earnedCoins = Math.round(delta * 2) + (delta > 0 ? bonus : 0);
-
-    // Rating adjustment
-    const r0 = getTopicRating(currentQ.topic);
-    const expected = 1 / (1 + Math.pow(10, (currentQ.d - r0) / 400));
-    const scoreVal = [0, 0.4, 0.7, 1.0][t];
-    const K = (state.solves || 0) < 10 ? 60 : 32;
-    const nextRating = Math.round(r0 + K * (scoreVal - expected));
+    const reward = sandboxResult?.reward;
+    if (!reward?.stats) {
+      setExecutionError(
+        sandboxResult?.rewardError
+          ? "Your solution was accepted, but rewards could not be saved. Refresh your profile stats and try again later."
+          : "Your solution was accepted, but the server did not return updated reward stats.",
+      );
+      return;
+    }
 
     if (document.fullscreenElement) {
       document.exitFullscreen?.().catch(() => {});
     }
 
     setState((s) => {
-      const nextSolves = (s.solves || 0) + 1;
-      const nextScore = s.score + Math.round(delta * 10);
-      const isCalibrated =
-        s.calibrating && nextSolves >= 10 && nextScore >= 1500;
-
       return {
         ...s,
-        coins: s.coins + earnedCoins,
-        score: nextScore,
-        solves: nextSolves,
-        calibrating: isCalibrated ? false : s.calibrating,
-        ratings: { ...s.ratings, [currentQ.topic]: nextRating },
-        best: { ...s.best, [currentQ.key]: Math.max(prevBest, awardedPts) },
+        headerStats: reward.stats,
+        coins: reward.stats.coins,
+        score: reward.stats.scoreUnits,
+        rating: reward.stats.rating,
+        streak: reward.stats.streak,
+        solves: reward.awarded ? (s.solves || 0) + 1 : s.solves,
+        ratings: { ...s.ratings, [currentQ.topic]: reward.stats.rating },
+        best: {
+          ...s.best,
+          [currentQ.key]: Math.max(
+            s.best?.[currentQ.key] || 0,
+            reward.points || 0,
+          ),
+        },
         dailyDone: !currentQ.stretch ? true : s.dailyDone,
         stretchN: currentQ.stretch ? (s.stretchN || 0) + 1 : s.stretchN,
         att: null,
@@ -302,12 +287,13 @@ function getStarterTemplate(q, lang) {
     });
 
     setResultData({
-      tier: t,
-      pts: delta,
-      coins: earnedCoins,
+      tier: 3,
+      pts: reward.points,
+      coins: reward.coinsEarned,
       mode: attempt.mode,
       analysis: an,
-      bonus,
+      bonus: reward.awarded ? 10 : 0,
+      awarded: reward.awarded,
       sandbox: sandboxResult,
     });
   };
@@ -716,6 +702,11 @@ function getStarterTemplate(q, lang) {
                 Awarded: <b>+{resultData.pts} Pts</b> • Earned: <b>+{resultData.coins} Coins</b>
                 {resultData.bonus > 0 && " (Includes 10 coin optimal bonus!)"}
               </p>
+              {!resultData.awarded && (
+                <p className="mu" style={{ margin: "6px 0 10px" }}>
+                  Rewards for this problem were already claimed.
+                </p>
+              )}
               {resultData.analysis && (
                 <div style={{ fontSize: "12px" }}>
                   Analyzed Complexity: Time {resultData.analysis.time[0] === 1 ? "O(n)" : resultData.analysis.time[0] === 2 ? "O(n²)" : "O(1)"} • Space {resultData.analysis.space === 1 ? "O(1)" : "O(n)"}
