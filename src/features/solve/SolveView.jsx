@@ -272,7 +272,6 @@ function getStarterTemplate(q, lang) {
         rating: reward.stats.rating,
         streak: reward.stats.streak,
         solves: reward.awarded ? (s.solves || 0) + 1 : s.solves,
-        ratings: { ...s.ratings, [currentQ.topic]: reward.stats.rating },
         best: {
           ...s.best,
           [currentQ.key]: Math.max(
