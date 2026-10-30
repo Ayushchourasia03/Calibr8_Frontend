@@ -13,6 +13,7 @@ export function Header() {
     showToast,
     setCurrentQ,
     createQuestion,
+    logout,
   } = useCalibr8();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -212,6 +213,16 @@ export function Header() {
           >
             {state.user && !state.user.guest ? "Switch account" : "Log in"}
           </button>
+          {state.user && !state.user.guest && (
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                void logout();
+              }}
+            >
+              Log out
+            </button>
+          )}
         </div>
       )}
     </header>
