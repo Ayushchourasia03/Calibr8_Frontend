@@ -9,7 +9,7 @@ const GithubIcon = () => (
 );
 
 const LinkedinIcon = () => (
-  <span className="flex h-5 w-5 items-center justify-center rounded-[4px] bg-[#0a66c2] text-[11px] font-bold leading-none text-white">
+  <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-[#0a66c2] text-[11px] font-bold leading-none text-white">
     in
   </span>
 );
@@ -59,7 +59,7 @@ function Avatar({ src, name }) {
 
 function Stat({ label, value }) {
   return (
-    <div className="rounded-lg border border-white/5 bg-white/[0.03] px-2.5 py-1.5 text-center">
+    <div className="rounded-lg border border-white/5 bg-white/3 px-2.5 py-1.5 text-center">
       <div className="text-sm font-bold text-white">{value ?? 0}</div>
       <div className="text-[10px] text-slate-400">{label}</div>
     </div>
@@ -176,7 +176,7 @@ export function ConnectedAccounts({ onRequireAuth }) {
           return (
             <div
               key={id}
-              className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
+              className="space-y-3 rounded-xl border border-white/10 bg-white/3 p-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold text-white">

@@ -66,7 +66,6 @@ async function waitForBackend(child) {
 
 async function main() {
   let ownedBackend = null;
-  let frontend = null;
   try {
     if (await backendIsReady()) {
       console.log(`Using existing backend at ${backendUrl}`);
@@ -77,11 +76,11 @@ async function main() {
       console.log(`Backend is ready at ${backendHealthUrl}`);
     }
 
-    frontend = launchNode(
+    const frontend = launchNode(
       [
         path.join(frontendDir, "node_modules", "vite", "bin", "vite.js"),
         "--host",
-        "0.0.0.0",
+        "127.0.0.1",
         "--port",
         "5173",
       ],

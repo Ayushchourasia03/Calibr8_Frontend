@@ -10,9 +10,8 @@ const backendProxy = {
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    host: "0.0.0.0",
+    host: "127.0.0.1",
     port: 5173,
-    allowedHosts: true,
     proxy: {
       "/api": backendProxy,
       "/health": backendProxy,
@@ -20,7 +19,7 @@ export default defineConfig({
     },
   },
   preview: {
-    host: "0.0.0.0",
+    host: "127.0.0.1",
     port: 5173,
     proxy: {
       "/api": backendProxy,
