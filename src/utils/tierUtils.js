@@ -19,18 +19,16 @@ export function getTierInfo(rating = 1000) {
   const t = getTierForRating(rating);
   const sp = 200 / 3;
   const nextAt =
-    t.dv < 2
-      ? t.lo + Math.round((t.dv + 1) * sp)
-      : t.i < 5
-        ? t.lo + 200
-        : null;
+    t.dv < 2 ? t.lo + Math.round((t.dv + 1) * sp) : t.i < 5 ? t.lo + 200 : null;
   const nextName =
     t.dv < 2
       ? `${t.name} ${ROMAN_NUMERALS[t.dv + 1]}`
       : t.i < 5
         ? `${TIERS[t.i + 1]} I`
         : null;
-  const pr = nextAt ? Math.min(1, Math.max(0, (rating - (nextAt - sp)) / sp)) : 1;
+  const pr = nextAt
+    ? Math.min(1, Math.max(0, (rating - (nextAt - sp)) / sp))
+    : 1;
 
   return {
     ...t,
@@ -51,6 +49,9 @@ export const todayKey = () => {
 
 let SHN = 0;
 export function renderShieldSvg(i = 0, dv = 0, sz = 76, cal = false) {
+  i = Number.isInteger(i) ? Math.min(TIERS.length - 1, Math.max(0, i)) : 0;
+  dv = Number.isInteger(dv) ? Math.min(2, Math.max(0, dv)) : 0;
+  sz = Number.isFinite(sz) ? Math.min(256, Math.max(16, Math.floor(sz))) : 76;
   const id = `sg_${++SHN}`;
   const c = TIER_COLORS[i] || "#2F7BFF";
   const c2 =
@@ -64,7 +65,7 @@ export function renderShieldSvg(i = 0, dv = 0, sz = 76, cal = false) {
         60 + oy - k * 11
       }' fill='none' stroke='#fff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' opacity='${
         1 - k * 0.12
-      }'/>`
+      }'/>`,
   ).join("");
   const wings =
     i >= 3
@@ -83,12 +84,12 @@ export function renderShieldSvg(i = 0, dv = 0, sz = 76, cal = false) {
       (k) =>
         `<circle cx='${38 + k * 12}' cy='96' r='3.6' fill='${
           k <= dv ? "#fff" : "rgba(255,255,255,.3)"
-        }'/>`
+        }'/>`,
     )
     .join("");
 
   return `<svg viewBox='-14 -16 128 148' width='${sz}' height='${Math.round(
-    sz * 1.16
+    sz * 1.16,
   )}' style='filter:drop-shadow(0 0 ${
     i >= 4 ? 14 : 6
   }px ${c});flex:none' class='${
@@ -108,12 +109,7 @@ export function ShieldBadge({
   size = 76,
   calibrating = false,
 }) {
-  const html = renderShieldSvg(
-    tierIndex,
-    divisionIndex,
-    size,
-    calibrating
-  );
+  const html = renderShieldSvg(tierIndex, divisionIndex, size, calibrating);
   return createElement("span", {
     style: { display: "inline-flex", verticalAlign: "middle" },
     dangerouslySetInnerHTML: { __html: html },
