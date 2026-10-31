@@ -81,7 +81,7 @@ async function main() {
       [
         path.join(frontendDir, "node_modules", "vite", "bin", "vite.js"),
         "--host",
-        "0.0.0.0",
+        "127.0.0.1",
         "--port",
         "5173",
       ],
