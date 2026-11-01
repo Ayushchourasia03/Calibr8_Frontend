@@ -492,7 +492,7 @@ function getStarterTemplate(q, lang) {
         <div className="card">
           {isStrict && (
             <div className="banner" style={{ borderLeft: "3px solid var(--bad)", marginBottom: "10px" }}>
-              <b>Strict Mode Active:</b> Fullscreen enabled. Tab switching or pasting will flag the attempt.
+              <b>Strict Mode Active:</b> Fullscreen enabled. Copy and paste permissions follow the editor configuration.
             </div>
           )}
 
@@ -559,7 +559,7 @@ function getStarterTemplate(q, lang) {
                 readOnly={!attempt}
                 isStrictMode={isStrict}
                 onPasteBlocked={() => {
-                  showToast("Pasting is disabled in Strict Mode!");
+                  showToast("Pasting is disabled for this mode.");
                 }}
                 onRun={handleRun}
                 onSubmit={handleSubmit}
