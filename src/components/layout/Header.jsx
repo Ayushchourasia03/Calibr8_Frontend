@@ -111,13 +111,6 @@ export function Header() {
   const coinsLabel = headerStats?.coins ?? state.coins ?? state.user?.coins ?? 0;
   const streakLabel = headerStats?.streak ?? state.streak ?? state.user?.streak ?? state.user?.currentStreak ?? 0;
 
-  // TEMP DEBUG - check console
-  console.log("STREAK DEBUG:", { 
-    headerStatsStreak: headerStats?.streak, 
-    stateStreak: state.streak, 
-    userStreak: state.user?.streak,
-    fullState: state 
-  });
 
   return (
     <header>

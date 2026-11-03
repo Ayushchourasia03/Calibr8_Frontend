@@ -1,14 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState, useEffect, useCallback } from "react";
-import { DEFAULT_QUESTION, BANK, DIFFICULTY_LABELS } from "../data/constants";
-import { SKINS } from "../data/themesData";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getTierInfo } from "../utils/tierUtils";
-import {
-  analyzeCode,
-  formatTimeComplexity,
-  formatSpaceComplexity,
-} from "../utils/codeAnalyzer";
 import { api, tokenStorage } from "../services/api";
+import { SKINS } from "../data/themesData";
 
 const STORAGE_KEY = "calibr8-v1";
 
@@ -24,7 +18,7 @@ const VIEW_PATHS = {
   store: "/store",
 };
 const PATH_VIEWS = Object.fromEntries(
-  Object.entries(VIEW_PATHS).map(([view, path]) => [path, view]),
+  Object.entries(VIEW_PATHS).map(([v, p]) => [p, v]),
 );
 
 function viewFromPath(pathname) {
@@ -33,38 +27,34 @@ function viewFromPath(pathname) {
 
 export const Calibr8Context = createContext(null);
 
+export function useCalibr8() {
+  const context = useContext(Calibr8Context);
+  if (!context) {
+    throw new Error("useCalibr8 must be used within Calibr8Provider");
+  }
+  return context;
+}
+
 export function Calibr8Provider({ children }) {
   const [state, setState] = useState(() => {
     const today = Math.floor(Date.now() / 864e5);
-    const hasAuthToken = Boolean(tokenStorage.get());
+    const hasToken = Boolean(tokenStorage.get());
     const initial = {
-      view: hasAuthToken ? viewFromPath(window.location.pathname) : "landing",
-      coins: 100,
+      view: hasToken ? viewFromPath(window.location.pathname) : "landing",
+      coins: 0,
       score: 0,
-      rating: 800,
+      rating: 0,
       streak: 0,
       headerStats: null,
       calibrating: false,
       theme: "default",
       skin: "default",
       ownedSkins: ["default"],
-      owned: ["default"],
-      board: "College",
       att: null,
-      levels: { "Sliding Window": 1, Graphs: 2, Arrays: 1 },
-      ratings: { "Sliding Window": 1250, Graphs: 1700, Arrays: 1250 },
-      topics: {
-        Arrays: 2,
-        Strings: 1,
-        Recursion: 0,
-        Graphs: 3,
-        "Sliding Window": 1,
-        DP: 0,
-        SQL: 1,
-        Aptitude: 2,
-      },
-      videos: { "Sliding Window": false, Graphs: true },
-      solves: 6,
+      levels: {},
+      ratings: {},
+      topics: {},
+      solves: 0,
       daily: null,
       dailyDone: false,
       stretch: null,
@@ -77,333 +67,187 @@ export function Calibr8Provider({ children }) {
       modePreferenceSet: false,
       lang: "Python3",
       user: null,
-      notes: {},
       activity: {},
       dd: {},
-      recent: [],
-      hist: [],
       name: "",
-      college: "",
       avatar: "🙂",
       wordDay: "",
       wordsLearned: 0,
-      lib: {},
-      libCat: 0,
-      act: "y",
       solved: {},
     };
-
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.dayStamp !== today) {
-          parsed.dayStamp = today;
           parsed.dailyDone = false;
           parsed.daily = null;
           parsed.stretch = null;
-          parsed.stretchN = 0;
         }
         return {
           ...initial,
           ...parsed,
           view:
-            hasAuthToken || parsed.user?.guest
+            hasToken || parsed.user?.guest
               ? viewFromPath(window.location.pathname)
               : "landing",
-          user: hasAuthToken || parsed.user?.guest ? parsed.user : null,
-          mode: parsed.modePreferenceSet ? parsed.mode : "light",
-          headerStats: hasAuthToken ? null : parsed.headerStats ?? null,
+          user: hasToken || parsed.user?.guest ? parsed.user : null,
+          headerStats: hasToken ? null : (parsed.headerStats ?? null),
         };
       }
     } catch {
-      // ignore
+      // Ignore invalid or unavailable local storage and use the defaults.
     }
     return initial;
   });
 
-  const [currentQ, setCurrentQ] = useState(DEFAULT_QUESTION);
+  const [currentQ, setCurrentQ] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
-
-  // Modals state
   const [activeModal, setActiveModal] = useState(null);
   const [modalData, setModalData] = useState(null);
-
-  // Auth modal state for quick sign-in triggers
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
-
-  // Skin preview state
   const [previewSkinId, setPreviewSkinId] = useState(null);
-
-  // Backend connectivity status
   const [backendConnected, setBackendConnected] = useState(false);
 
-  const showToast = useCallback((message) => {
-    setToastMessage(message);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3200);
+  const showToast = useCallback((m) => {
+    setToastMessage(m);
+    setTimeout(() => setToastMessage(null), 3200);
   }, []);
 
-  useEffect(() => {
-    const path = VIEW_PATHS[state.view] || "/";
-    if (window.location.pathname !== path) {
-      window.history.replaceState({}, "", path);
-    }
-  }, [state.view]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      const view = viewFromPath(window.location.pathname);
-      if (!tokenStorage.get() && !state.user?.guest && view !== "landing") {
-        window.history.replaceState({}, "", VIEW_PATHS.landing);
-        setState((current) => ({ ...current, view: "landing", user: null }));
-        return;
-      }
-      if (state.att?.mode === "strict" && state.att?.active) {
-        showToast("Finish or abandon the strict attempt first.");
-        window.history.replaceState({}, "", VIEW_PATHS[state.view] || "/");
-        return;
-      }
-      setState((current) => ({ ...current, view }));
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [showToast, state.att, state.user?.guest, state.view]);
-
-  // Sync skin and theme attributes to HTML root
-  useEffect(() => {
-    const isLanding = state.view === "landing";
-    const currentSkin = isLanding
-      ? "default"
-      : previewSkinId || state.skin || "default";
-    document.documentElement.dataset.skin = currentSkin;
-    const skinDef = SKINS[currentSkin];
-    if (isLanding) {
-      document.documentElement.dataset.theme = "light";
-    } else if (skinDef?.themeMode) {
-      document.documentElement.dataset.theme = skinDef.themeMode;
-    } else {
-      document.documentElement.dataset.theme = state.mode || "light";
-    }
-  }, [state.skin, state.mode, state.view, previewSkinId]);
-
-  // Save state to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      // ignore
+      // Storage can be unavailable in private browsing or restricted contexts.
     }
   }, [state]);
 
-  // Check backend health & sync authenticated user on app load
+  // Sync user from backend - single source of truth for coins/score/streak
   useEffect(() => {
-    let isMounted = true;
-
-    async function checkBackendAndUser() {
+    let mounted = true;
+    async function init() {
       try {
-        const healthRes = await api.system.health();
-        if (isMounted && (healthRes.status === "ok" || healthRes.success)) {
-          setBackendConnected(true);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setBackendConnected(false);
-          console.warn(
-            "[Calibr8] Backend at localhost:3000 not reachable:",
-            err.message,
-          );
-        }
+        const health = await api.system.health();
+        if (mounted && health.status === "ok") setBackendConnected(true);
+      } catch {
+        setBackendConnected(false);
       }
 
-      // Check existing auth token
       const token = tokenStorage.get();
       if (!token) return;
-
       try {
-        const authRes = await api.auth.getMe();
-        if (isMounted && authRes?.success && authRes.user) {
-          const u = authRes.user;
+        const res = await api.auth.getMe();
+        if (mounted && res?.success && res.user) {
           setState((s) => ({
             ...s,
-            user: u,
-            headerStats: authRes.stats || null,
-            name: u.name || s.name,
-            college: u.college || s.college,
-            rating: authRes.stats?.rating ?? u.rating ?? s.rating,
-            score: authRes.stats?.scoreUnits ?? u.score ?? s.score,
-            streak: authRes.stats?.streak ?? u.streak ?? s.streak,
-            coins: authRes.stats?.coins ?? u.coins ?? s.coins,
-            started: u.onboarded || s.started,
+            user: res.user,
+            headerStats: res.stats || null,
+            name: res.user.name || s.name,
+            rating: res.stats?.rating ?? res.user.rating ?? s.rating,
+            score: res.stats?.scoreUnits ?? res.user.score ?? s.score,
+            streak: res.stats?.streak ?? res.user.streak ?? s.streak,
+            coins: res.stats?.coins ?? res.user.coins ?? s.coins,
+            started: res.user.onboarded || s.started,
           }));
-
-          // Sync solved problems list from backend
-          try {
-            const solvedRes = await api.users.getSolvedProblems();
-            if (isMounted && solvedRes?.data) {
-              const solvedMap = {};
-              solvedRes.data.forEach((p) => {
-                if (p.isSolved) {
-                  solvedMap[p.slug || p.number] = true;
-                }
-              });
-              setState((s) => ({
-                ...s,
-                solved: { ...s.solved, ...solvedMap },
-              }));
-            }
-          } catch {
-            // ignore
-          }
-
-          // Sync user theme status from backend
-          try {
-            const themeRes = await api.themes.getMe();
-            if (isMounted && themeRes?.success) {
-              setState((s) => ({
-                ...s,
-                coins: themeRes.coins ?? s.coins,
-                skin: themeRes.activeTheme || s.skin,
-                ownedSkins: themeRes.ownedThemes || s.ownedSkins,
-              }));
-            }
-          } catch {
-            // ignore
-          }
         }
-      } catch (authErr) {
-        console.warn("Session expired or invalid:", authErr.message);
+      } catch {
         tokenStorage.remove();
-        if (isMounted) {
-          setState((s) => ({ ...s, user: null, view: "landing" }));
-        }
+        if (mounted) setState((s) => ({ ...s, user: null, view: "landing" }));
       }
     }
-
-    checkBackendAndUser();
-
+    init();
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, []);
-
-  const getTopicRating = (topic) => {
-    return (
-      state.ratings?.[topic] ?? [800, 1200, 1600][state.levels?.[topic] || 0]
-    );
-  };
-
-  const getOverallRating = () => {
-    const keys = Object.keys(state.levels || {});
-    if (!keys.length) return state.rating || 1200;
-    const sum = keys.reduce((acc, t) => acc + getTopicRating(t), 0);
-    return Math.round(sum / keys.length);
-  };
-
-  const createQuestion = (isStretch = false) => {
-    const L = state.levels || { Arrays: 1 };
-    const ts = Object.keys(L).sort(
-      (a, b) => getTopicRating(a) - getTopicRating(b),
-    );
-    const topic =
-      ts[(isStretch ? (state.stretchN || 0) + 1 : 0) % ts.length] || "Arrays";
-    const lvl = L[topic] ?? 1;
-    const b = BANK[topic] || ["Challenge", "Solve the challenge problem."];
-    const isSw = topic === "Sliding Window";
-
-    return {
-      topic,
-      l: lvl,
-      difficulty: lvl,
-      d: Math.round(getTopicRating(topic) - 147 + (isStretch ? 120 : 0)),
-      title: `${b[0]} (${DIFFICULTY_LABELS[lvl]})`,
-      text: b[1],
-      ex: isSw
-        ? "readings = [4, 8, 5, 1, 7], k = 4  ->  3"
-        : "See the statement details.",
-      pts: [10, 25, 50][lvl],
-      key: `${topic}_${lvl}_${isStretch ? "s" + state.stretchN : "d"}_${state.dayStamp}`,
-      slug: `daily-${topic.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-      hints: isSw
-        ? DEFAULT_QUESTION.hints
-        : [
-            "Think about what you must track as you scan the input.",
-            "Name the pattern that keeps that information cheaply.",
-            "Outline: set up, loop once, update the answer, return it.",
-          ],
-      trace: isSw ? DEFAULT_QUESTION.trace : [["Ready", "[]", "0", "0", "0"]],
-      stretch: Boolean(isStretch),
-    };
-  };
 
   const setView = (view) => {
     if (state.att?.mode === "strict" && state.att?.active) {
       showToast("Finish or abandon the strict attempt first.");
       return;
     }
-    if (!tokenStorage.get() && !state.user?.guest && view !== "landing") {
-      showToast("Please log in to continue.");
-      setState((s) => ({ ...s, view: "landing", user: null }));
-      return;
-    }
-    if (previewSkinId && view !== "store") {
-      setPreviewSkinId(null);
-    }
-    const path = VIEW_PATHS[view] || "/";
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, "", path);
-    }
     setState((s) => ({ ...s, view }));
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Sync topic calibration to local state + backend API (/api/onboarding)
-  const setTopicLevel = async (topic, level) => {
-    setState((s) => {
-      const nextLevels = { ...s.levels };
-      const nextRatings = { ...s.ratings };
+  const createQuestion = (isStretch = false) => {
+    const question = isStretch ? state.stretch : state.daily;
+    return question || {
+      key: isStretch ? "stretch-question" : "daily-question",
+      title: isStretch ? "Choose a stretch problem" : "Your daily question",
+      difficulty: isStretch ? "Medium" : "Easy",
+      topic: "Practice",
+      description: "Choose a problem from the catalogue to start practicing.",
+      hints: [],
+      examples: [],
+    };
+  };
 
-      if (level === null || level === undefined) {
-        delete nextLevels[topic];
-        delete nextRatings[topic];
+  const openProblemInSolver = (problem) => {
+    if (!problem) return;
+    setCurrentQ(problem);
+    setState((current) => ({ ...current, att: null, view: "solve" }));
+  };
+
+  const login = async (credentials) => {
+    const result = await api.auth.login(credentials);
+    const user = result?.user;
+    if (user) {
+      setState((current) => ({
+        ...current,
+        user,
+        name: user.name || current.name,
+        view: "home",
+      }));
+    }
+    return result;
+  };
+
+  const logout = async () => {
+    await api.auth.logout();
+    setState((current) => ({ ...current, user: null, headerStats: null, view: "landing" }));
+    setCurrentQ(null);
+  };
+
+  const exploreDemo = () => {
+    setState((current) => ({
+      ...current,
+      user: { guest: true, email: "guest@calibr8.local", name: "Guest Learner" },
+      name: "Guest Learner",
+      view: "home",
+    }));
+  };
+
+  const buyOrApplySkin = async (skinId) => {
+    const skin = SKINS[skinId];
+    if (!skin) return false;
+    try {
+      if (state.ownedSkins?.includes(skinId)) {
+        if (tokenStorage.get()) await api.themes.applyTheme(skinId);
       } else {
-        nextLevels[topic] = level;
-        nextRatings[topic] = [800, 1200, 1600][level];
+        if (tokenStorage.get()) {
+          const result = await api.themes.buyTheme(skinId);
+          setState((current) => ({
+            ...current,
+            coins: result.coins ?? current.coins,
+            ownedSkins: [...new Set([...(current.ownedSkins || []), skinId])],
+          }));
+        } else if ((state.coins || 0) < skin.price) {
+          showToast("You need more coins to buy this theme.");
+          return false;
+        } else {
+          setState((current) => ({
+            ...current,
+            coins: current.coins - skin.price,
+            ownedSkins: [...new Set([...(current.ownedSkins || []), skinId])],
+          }));
+        }
       }
-
-      const keys = Object.keys(nextRatings);
-      const nextOverall = keys.length
-        ? Math.round(
-            keys.reduce((acc, k) => acc + nextRatings[k], 0) / keys.length,
-          )
-        : s.rating || 1200;
-
-      return {
-        ...s,
-        levels: nextLevels,
-        ratings: nextRatings,
-        rating: nextOverall,
-      };
-    });
-
-    // If authenticated, sync topic levels with backend API
-    if (tokenStorage.get()) {
-      try {
-        const topicSelections = Object.entries({
-          ...state.levels,
-          ...(level !== null && level !== undefined ? { [topic]: level } : {}),
-        }).map(([tName, lvl]) => ({
-          topicId: tName.toLowerCase().replace(/\s+/g, "-"),
-          difficulty: ["easy", "medium", "hard"][lvl] || "medium",
-        }));
-
-        await api.onboarding.submit({ topicSelections });
-      } catch (err) {
-        console.warn("Backend calibration sync note:", err.message);
-      }
+      setState((current) => ({ ...current, skin: skinId, theme: skinId }));
+      return true;
+    } catch (error) {
+      showToast(error.message || "Could not apply this theme.");
+      return false;
     }
   };
 
@@ -415,326 +259,12 @@ export function Calibr8Provider({ children }) {
     }));
   };
 
-  // Purchase or apply theme with backend API integration (/api/themes)
-  const buyOrApplySkin = async (skinId) => {
-    const skin = SKINS[skinId];
-    if (!skin) return false;
-    const owned = state.ownedSkins || ["default"];
-    const isOwned = owned.includes(skinId);
-    const isAuthenticated = Boolean(tokenStorage.get());
+  const getTopicRating = (topic) => {
+    const rating = Number(state.ratings?.[topic]);
+    if (Number.isFinite(rating) && rating > 0) return rating;
 
-    if (!isOwned) {
-      if (!isAuthenticated) {
-        showToast("Sign in to purchase themes and save them to your account.");
-        return false;
-      }
-
-      try {
-        const res = await api.themes.buyTheme(skinId);
-        if (!res?.success || res.coins === undefined) {
-          throw new Error("The purchase was not confirmed by the server.");
-        }
-        setState((s) => ({
-          ...s,
-          coins: res.coins,
-          user: s.user ? { ...s.user, coins: res.coins } : s.user,
-          headerStats: res.stats || {
-            ...s.headerStats,
-            coins: res.coins,
-          },
-          rating: res.stats?.rating ?? s.rating,
-          score: res.stats?.scoreUnits ?? s.score,
-          streak: res.stats?.streak ?? s.streak,
-          ownedSkins: [...new Set([...(s.ownedSkins || []), skinId])],
-          skin: skinId,
-        }));
-        setPreviewSkinId(null);
-        showToast(`Purchased & applied ${skin.name} theme!`);
-        return true;
-      } catch (apiErr) {
-        if (apiErr.code === "ALREADY_OWNED") {
-          try {
-            await api.themes.applyTheme(skinId);
-            setState((s) => ({
-              ...s,
-              ownedSkins: [...new Set([...(s.ownedSkins || []), skinId])],
-              skin: skinId,
-            }));
-            setPreviewSkinId(null);
-            showToast(`Applied ${skin.name} theme.`);
-            return true;
-          } catch (applyErr) {
-            showToast(applyErr.message || "Unable to apply this theme.");
-            return false;
-          }
-        }
-        showToast(apiErr.message || "Unable to purchase this theme.");
-        return false;
-      }
-    } else {
-      // Apply theme
-      if (isAuthenticated) {
-        try {
-          await api.themes.applyTheme(skinId);
-        } catch (apiErr) {
-          showToast(apiErr.message || "Unable to apply this theme.");
-          return false;
-        }
-      }
-
-      setState((s) => ({
-        ...s,
-        skin: skinId,
-      }));
-      setPreviewSkinId(null);
-      showToast(`Applied ${skin.name} theme.`);
-      return true;
-    }
-  };
-
-  // Open Problem in Solver with live backend templates & visible testcases if available
-  const openProblemInSolver = async (problem) => {
-    const slug = problem.slug || `prob-${problem.id}`;
-
-    // Base fallback question structure
-    let questionData = {
-      topic: problem.t || problem.topic || "Arrays",
-      l: problem.l ?? 0,
-      difficulty: problem.l ?? 0,
-      d: problem.d || 1200,
-      title: `${problem.title} (${DIFFICULTY_LABELS[problem.l ?? 0]})`,
-      text: `A ${DIFFICULTY_LABELS[problem.l ?? 0].toLowerCase()} ${problem.t || "DSA"} problem from the Calibr8 catalog. Solve it with optimal time and space complexity.`,
-      ex: "Read constraints and implement the requested algorithm.",
-      pts: problem.pts || [10, 25, 50][problem.l ?? 0],
-      key: `c${problem.id}`,
-      slug,
-      hints: [
-        "Think about what you must track as you scan the input.",
-        "Name the pattern that keeps that information cheaply.",
-        "Outline: set up, loop once, update the answer, return it.",
-      ],
-      trace: [["Step 1", "[init]", "0", "0", "0"]],
-      stretch: false,
-    };
-
-    // Attempt to fetch full details & starter templates from backend (/api/problems/:slug)
-    try {
-      const res = await api.problems.getBySlug(slug);
-      if (res?.data) {
-        const d = res.data;
-        questionData = {
-          ...questionData,
-          title: d.title ? `${d.title} (${d.difficulty})` : questionData.title,
-          text: d.description || questionData.text,
-          difficulty:
-            d.difficulty === "Easy" ? 0 : d.difficulty === "Hard" ? 2 : 1,
-          testcases: d.testcases || [],
-          templates: d.templates || {},
-        };
-      }
-    } catch {
-      // Use local catalog data
-    }
-
-    setCurrentQ(questionData);
-    setState((s) => ({ ...s, att: null }));
-    setView("solve");
-  };
-
-  // --- Backend Authentication API Integration ---
-  const login = async ({ email, password }) => {
-    const res = await api.auth.login({ email, password });
-    if (res?.success && res.user) {
-      const u = res.user;
-      setState((s) => ({
-        ...s,
-        user: u,
-        headerStats: res.stats || null,
-        name: u.name || s.name,
-        college: u.college || s.college,
-        rating: res.stats?.rating ?? u.rating ?? s.rating,
-        score: res.stats?.scoreUnits ?? u.score ?? s.score,
-        streak: res.stats?.streak ?? u.streak ?? s.streak,
-        coins: res.stats?.coins ?? u.coins ?? s.coins,
-        started: u.onboarded || s.started,
-      }));
-    }
-    return res;
-  };
-
-  const register = async ({ name, email, password }) => {
-    const res = await api.auth.register({ name, email, password });
-    if (res?.success && res.user) {
-      const u = res.user;
-      setState((s) => ({
-        ...s,
-        user: u,
-        headerStats: res.stats || null,
-        name: u.name || s.name,
-        college: u.college || s.college,
-        rating: res.stats?.rating ?? u.rating ?? s.rating,
-        score: res.stats?.scoreUnits ?? u.score ?? s.score,
-        coins: res.stats?.coins ?? u.coins ?? s.coins,
-        started: u.onboarded || s.started,
-      }));
-    }
-    return res;
-  };
-
-  const logout = async () => {
-    try {
-      await api.auth.logout();
-    } catch (err) {
-      console.warn("Backend logout note:", err.message);
-    } finally {
-      tokenStorage.remove();
-      setState((s) => ({
-        ...s,
-        user: null,
-        view: "landing",
-      }));
-    }
-  };
-
-  const refreshUser = async () => {
-    const res = await api.users.getProfile();
-    if (res?.success && res.user) {
-      const u = res.user;
-      setState((s) => ({
-        ...s,
-        user: u,
-        name: u.name || s.name,
-        college: u.college || s.college,
-        rating: u.rating ?? s.rating,
-        score: u.score ?? s.score,
-        streak: u.streak ?? s.streak,
-        coins: u.coins ?? s.coins,
-      }));
-      return u;
-    }
-    return null;
-  };
-
-  const updateProfileName = async (name) => {
-    setState((s) => ({ ...s, name }));
-    if (tokenStorage.get()) {
-      try {
-        const res = await api.users.updateName({ name });
-        if (res?.user) {
-          setState((s) => ({ ...s, user: { ...s.user, ...res.user } }));
-        }
-      } catch (err) {
-        console.warn("Backend name update note:", err.message);
-      }
-    }
-  };
-
-  const updateAcademicProfile = async (academic) => {
-    setState((s) => ({ ...s, ...academic }));
-    if (tokenStorage.get()) {
-      try {
-        await api.users.updateAcademic(academic);
-      } catch (err) {
-        console.warn("Backend academic update note:", err.message);
-      }
-    }
-  };
-
-  const updateLanguage = async (language) => {
-    setState((s) => ({ ...s, lang: language }));
-    try {
-      await api.onboarding.updateLanguage(language);
-    } catch {
-      try {
-        await api.users.updateLanguage({ language });
-      } catch (err) {
-        console.warn("Backend language update note:", err.message);
-      }
-    }
-  };
-
-  const saveOnboarding = async (payload) => {
-    try {
-      const res = await api.onboarding.submit(payload);
-      if (res?.user) {
-        setState((s) => ({
-          ...s,
-          user: { ...s.user, ...res.user },
-          started: true,
-        }));
-      }
-      return res;
-    } catch (err) {
-      console.warn("Backend onboarding note:", err.message);
-      return null;
-    }
-  };
-
-  const exploreDemo = useCallback(() => {
-    const dsaTopics = [
-      "Arrays",
-      "Strings",
-      "Recursion",
-      "Graphs",
-      "Sliding Window",
-      "DP",
-      "Trees",
-      "Linked List",
-    ];
-    const easyLevels = {};
-    const easyRatings = {};
-    dsaTopics.forEach((t) => {
-      easyLevels[t] = 0; // 0 = Easy
-      easyRatings[t] = 800; // 800 = Easy calibration rating
-    });
-
-    setState((s) => ({
-      ...s,
-      started: true,
-      calibrating: false,
-      rating: 800,
-      score: s.score || 800,
-      levels: easyLevels,
-      ratings: easyRatings,
-      lang: s.lang || "Python3",
-      user: s.user || {
-        guest: true,
-        name: "Demo Learner",
-        email: "demo@calibr8.local",
-        difficulty: "easy",
-        rating: 800,
-      },
-      view: "home",
-    }));
-
-    showToast("Demo started! All DSA topics set to Easy.");
-  }, [showToast]);
-
-  // Run code against backend execution sandbox (/api/execution/runs)
-  const runCode = async ({ slug, problemId, language, code }) => {
-    return await api.execution.run({ slug, problemId, language, code });
-  };
-
-  // Submit code for judging with backend polling (/api/execution/submissions)
-  const submitCode = async ({
-    slug,
-    problemId,
-    language,
-    code,
-    onProgress,
-  }) => {
-    const submission = await api.execution.submit({
-      slug,
-      problemId,
-      language,
-      code,
-    });
-    if (submission?.submissionId) {
-      return await api.execution.pollSubmission(submission.submissionId, {
-        onProgress,
-      });
-    }
-    return submission;
+    const level = Number(state.levels?.[topic] ?? 0);
+    return [800, 1200, 1600][level] ?? 800;
   };
 
   return (
@@ -742,8 +272,6 @@ export function Calibr8Provider({ children }) {
       value={{
         state,
         setState,
-        user: state.user,
-        setUser: (u) => setState((s) => ({ ...s, user: u })),
         currentQ,
         setCurrentQ,
         activeModal,
@@ -754,32 +282,23 @@ export function Calibr8Provider({ children }) {
         setPreviewSkinId,
         toastMessage,
         showToast,
-        getTopicRating,
-        getOverallRating,
-        createQuestion,
         setView,
-        setTopicLevel,
-        toggleThemeMode,
-        buyOrApplySkin,
+        createQuestion,
         openProblemInSolver,
-        tierInfo: getTierInfo(state.rating),
-        analyzeCode,
-        formatTimeComplexity,
-        formatSpaceComplexity,
-        // Backend API integrations
-        backendConnected,
         login,
-        register,
         logout,
-        refreshUser,
-        updateProfileName,
-        updateAcademicProfile,
-        updateLanguage,
-        saveOnboarding,
         exploreDemo,
-        runCode,
-        submitCode,
-        // Auth modal controls
+        buyOrApplySkin,
+        user: state.user,
+        refreshUser: async () => {
+          const result = await api.auth.getMe();
+          if (result?.user) setState((current) => ({ ...current, user: result.user }));
+          return result;
+        },
+        toggleThemeMode,
+        getTopicRating,
+        tierInfo: getTierInfo(state.rating),
+        backendConnected,
         isAuthModalOpen,
         setAuthModalOpen,
         authMode,
@@ -791,5 +310,3 @@ export function Calibr8Provider({ children }) {
     </Calibr8Context.Provider>
   );
 }
-
-export { useCalibr8 } from "./useCalibr8";
