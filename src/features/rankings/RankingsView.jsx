@@ -4,6 +4,7 @@ import { getTierForRating } from "../../utils/tierUtils";
 import { rankingsApi } from "./rankingsApi";
 import { usersApi } from "../profile/usersApi";
 import { tokenStorage } from "../../services/apiClient";
+import { SkeletonPodium, SkeletonTable } from "../../components/common/Skeleton";
 
 const AVG = [
   "linear-gradient(135deg,#5EA0FF,#B16BFF)",
@@ -158,7 +159,14 @@ export function RankingsView() {
         )}
       </div>
 
-      {loading && <p className="mu">Loading rankings…</p>}
+      {loading && (
+        <div style={{ marginTop: "14px" }}>
+          <SkeletonPodium />
+          <div className="card" style={{ padding: "0" }}>
+            <SkeletonTable rows={6} cols={4} />
+          </div>
+        </div>
+      )}
       {error && (
         <div className="card" role="alert">
           <p>{error}</p>

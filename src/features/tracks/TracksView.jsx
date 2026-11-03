@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { topicsApi } from "./topicsApi";
 import { studyApi } from "../library/studyApi";
+import { SkeletonGrid, SkeletonTable } from "../../components/common/Skeleton";
 
 export function TracksView() {
   const { openProblemInSolver, setState, setView } = useCalibr8();
@@ -92,8 +93,8 @@ export function TracksView() {
 
       <section>
         <h2>DSA practice</h2>
-        {loadingCategories && <p className="mu">Loading practice tracks…</p>}
       </section>
+      {loadingCategories && <SkeletonGrid count={4} height="85px" />}
       {error && (
         <div className="card" role="alert">
           <p>{error}</p>
@@ -116,29 +117,31 @@ export function TracksView() {
         <p className="mu">No practice tracks are available yet.</p>
       )}
 
-      <div className="grid tk">
-        {categories.map((category) => (
-          <button
-            type="button"
-            key={category.id}
-            className={`card ${selectedCategory?.id === category.id ? "on" : ""}`}
-            onClick={() => openCategory(category)}
-            style={{ textAlign: "left", cursor: "pointer" }}
-          >
-            <h3>{category.name}</h3>
-            <p className="mu">
-              {category.totalProblems ?? 0} backend problems
-            </p>
-          </button>
-        ))}
-      </div>
+      {!loadingCategories && (
+        <div className="grid tk">
+          {categories.map((category) => (
+            <button
+              type="button"
+              key={category.id}
+              className={`card ${selectedCategory?.id === category.id ? "on" : ""}`}
+              onClick={() => openCategory(category)}
+              style={{ textAlign: "left", cursor: "pointer" }}
+            >
+              <h3>{category.name}</h3>
+              <p className="mu">
+                {category.totalProblems ?? 0} backend problems
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
 
       <section>
         <h2>Study tracks</h2>
         <p className="mu">
           Open backend-maintained study material by subject and continue into its chapters and lessons.
         </p>
-        {loadingSubjects && <p className="mu">Loading study tracks…</p>}
+        {loadingSubjects && <SkeletonGrid count={4} height="120px" />}
         {!loadingSubjects && studySubjects.length === 0 && !error && (
           <p className="mu">No study tracks are available yet.</p>
         )}
@@ -167,7 +170,11 @@ export function TracksView() {
       {selectedCategory && (
         <section>
           <h2>{selectedCategory.name}</h2>
-          {loadingProblems && <p className="mu">Loading problems…</p>}
+          {loadingProblems && (
+            <div className="card" style={{ padding: "0", overflow: "hidden" }}>
+              <SkeletonTable rows={4} cols={4} />
+            </div>
+          )}
           {!loadingProblems && !error && problems.length === 0 && (
             <p className="mu">No problems are available in this track yet.</p>
           )}

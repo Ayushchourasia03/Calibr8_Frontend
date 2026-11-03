@@ -80,7 +80,7 @@ export function Header() {
     (state.user && !state.user.guest
       ? state.user.email?.split("@")[0]
       : "Guest");
-  const isSignedIn = Boolean(state.user && !state.user.guest);
+  const _isSignedIn = Boolean(state.user && !state.user.guest);
   // const headerStats = state.headerStats;
   // const tierLabel = state.calibrating
   //   ? "Calibrating"

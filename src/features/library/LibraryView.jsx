@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { studyApi } from "./studyApi";
 import { useCalibr8 } from "../../context/Calibr8Context";
+import { Skeleton, SkeletonGrid } from "../../components/common/Skeleton";
 
 function StudyContent({ content }) {
   const lines = (content || "").split(/\r?\n/);
@@ -196,7 +197,13 @@ export function LibraryView() {
         Browse backend study subjects, chapters, lessons, and practice questions.
       </p>
 
-      {loadingSubjects && <p className="mu">Loading study subjects…</p>}
+      {loadingSubjects && (
+        <div className="row" style={{ gap: "8px", margin: "14px 0" }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} width="130px" height="34px" borderRadius="999px" />
+          ))}
+        </div>
+      )}
       {error && (
         <div className="card" role="alert">
           <p>{error}</p>
@@ -220,21 +227,28 @@ export function LibraryView() {
         <p className="mu">No study subjects are available yet.</p>
       )}
 
-      <div className="row">
-        {subjects.map((item) => (
-          <button
-            key={item.id}
-            className={`pill ${subject?.slug === item.slug ? "on" : ""}`}
-            onClick={() => selectSubject(item.slug)}
-          >
-            {item.icon ? `${item.icon} ` : ""}
-            {item.name}
-          </button>
-        ))}
-      </div>
+      {!loadingSubjects && (
+        <div className="row">
+          {subjects.map((item) => (
+            <button
+              key={item.id}
+              className={`pill ${subject?.slug === item.slug ? "on" : ""}`}
+              onClick={() => selectSubject(item.slug)}
+            >
+              {item.icon ? `${item.icon} ` : ""}
+              {item.name}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {loadingSubject && <p className="mu">Loading chapters…</p>}
-      {subject && (
+      {loadingSubject && (
+        <div style={{ marginTop: "16px" }}>
+          <Skeleton width="40%" height="24px" style={{ marginBottom: "12px" }} />
+          <SkeletonGrid count={4} height="110px" />
+        </div>
+      )}
+      {subject && !loadingSubject && (
         <section>
           <h2>{subject.name}</h2>
           {subject.description && <p className="mu">{subject.description}</p>}
@@ -255,7 +269,10 @@ export function LibraryView() {
                   {openChapter === chapter.id && (
                     <div className="space-y-2" style={{ marginTop: 12 }}>
                       {loadingChapter === chapter.id && (
-                        <p className="mu">Loading topics…</p>
+                        <div style={{ display: "grid", gap: "6px", marginTop: "8px" }}>
+                          <Skeleton width="85%" height="18px" />
+                          <Skeleton width="65%" height="18px" />
+                        </div>
                       )}
                       {(chapterTopics[chapter.id] || []).map((topic) => (
                         <button
@@ -267,7 +284,7 @@ export function LibraryView() {
                           {topic.name}
                         </button>
                       ))}
-                      {chapterTopics[chapter.id]?.length === 0 && (
+                      {chapterTopics[chapter.id]?.length === 0 && !loadingChapter && (
                         <p className="mu">No topics in this chapter yet.</p>
                       )}
                     </div>
@@ -281,7 +298,15 @@ export function LibraryView() {
         </section>
       )}
 
-      {loadingTopic && <p className="mu">Loading study material…</p>}
+      {loadingTopic && (
+        <div className="card" style={{ display: "grid", gap: "10px", marginTop: "16px" }}>
+          <Skeleton width="50%" height="24px" />
+          <Skeleton width="95%" height="16px" />
+          <Skeleton width="90%" height="16px" />
+          <Skeleton width="75%" height="16px" />
+          <Skeleton width="100%" height="100px" borderRadius="10px" />
+        </div>
+      )}
       {selectedTopic && (
         <div
           className="modal"

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { DIFFICULTY_LABELS } from "../../data/constants";
 import { problemsApi } from "./problemsApi";
+import { Skeleton } from "../../components/common/Skeleton";
 
 const difficultyIndex = (difficulty) => {
   const normalized = String(difficulty || "").toLowerCase();
@@ -310,9 +311,17 @@ export function ProblemsView() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={7} className="mu">Loading problems…</td>
-                  </tr>
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={`sk-${i}`}>
+                      <td><Skeleton width="24px" height="14px" /></td>
+                      <td><Skeleton width={i % 2 === 0 ? "70%" : "55%"} height="14px" /></td>
+                      <td><Skeleton width="80px" height="20px" borderRadius="999px" /></td>
+                      <td><Skeleton width="60px" height="20px" borderRadius="999px" /></td>
+                      <td><Skeleton width="40px" height="14px" /></td>
+                      <td><Skeleton width="30px" height="14px" /></td>
+                      <td><Skeleton width="50px" height="14px" /></td>
+                    </tr>
+                  ))
                 ) : loadError ? (
                   <tr>
                     <td colSpan={7} role="alert">{loadError}</td>

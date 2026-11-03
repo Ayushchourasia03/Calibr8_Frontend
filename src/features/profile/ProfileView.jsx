@@ -5,6 +5,7 @@ import { DIFFICULTY_LABELS } from "../../data/constants";
 import { usersApi } from "./usersApi";
 import { tokenStorage } from "../../services/apiClient";
 import { ConnectedAccounts } from "./ConnectedAccounts";
+import { Skeleton } from "../../components/common/Skeleton";
 
 const AVATARS = [
   "🙂", "😎", "🤓", "🧑‍💻", "👩‍💻", "🧑‍🚀", "🦊", "🐼", "🚀", "🎮",
@@ -304,15 +305,24 @@ export function ProfileView() {
           <div className="phead">
             <span className="av big2">{state.avatar || "🙂"}</span>
             <div className="pinfo">
-              <h2 style={{ margin: 0 }}>{myName}</h2>
-              <p className="mu" style={{ margin: "2px 0" }}>
-                {state.user
-                  ? state.user.guest
-                    ? "Guest on this device"
-                    : state.user.email
-                  : "Not signed in"}
-                {state.college ? ` · ${state.college}` : ""}
-              </p>
+              {loadingProfile ? (
+                <div style={{ display: "grid", gap: "6px" }}>
+                  <Skeleton width="160px" height="24px" />
+                  <Skeleton width="220px" height="14px" />
+                </div>
+              ) : (
+                <>
+                  <h2 style={{ margin: 0 }}>{myName}</h2>
+                  <p className="mu" style={{ margin: "2px 0" }}>
+                    {state.user
+                      ? state.user.guest
+                        ? "Guest on this device"
+                        : state.user.email
+                      : "Not signed in"}
+                    {state.college ? ` · ${state.college}` : ""}
+                  </p>
+                </>
+              )}
             </div>
             <div style={{ textAlign: "center" }}>
               <ShieldBadge

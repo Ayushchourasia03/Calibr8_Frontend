@@ -92,7 +92,7 @@ export const apiConfig = {
       return envUrl.trim().replace(/\/+$/, "");
     }
 
-    return "";
+    return "http://localhost:3000";
   },
 
   /**

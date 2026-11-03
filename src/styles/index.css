@@ -49,6 +49,19 @@ body.race {
 * {
   box-sizing: border-box;
 }
+
+@keyframes cal-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-box {
+  animation: cal-shimmer 1.8s infinite ease-in-out;
+}
 html,
 body {
   height: 100%;
