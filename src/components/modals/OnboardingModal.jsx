@@ -10,15 +10,7 @@ const ONBOARD_LANGS = [
   "C++",
   "Java",
   "Python3",
-  "TypeScript",
-  "Go",
-  "Kotlin",
-  "Rust",
-  "C#",
   "C",
-  "Ruby",
-  "PHP",
-  "Swift",
 ];
 
 export function OnboardingModal() {
@@ -52,24 +44,27 @@ export function OnboardingModal() {
   const [topicsLoading, setTopicsLoading] = useState(
     () => modalData?.step === 1,
   );
+  const [topicsRetry, setTopicsRetry] = useState(0);
   const [loading, setLoading] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!isOpen || step !== 1) return undefined;
+    if (!isOpen || step !== 1 || dsaTopics.length > 0) return undefined;
 
     let cancelled = false;
     topicsApi
       .getDsa()
       .then((result) => {
         if (!cancelled) {
-          setDsaTopics(
-            (result?.topics || []).map((topic) => ({
-              ...topic,
-              displayName: topic.name.replace(/^DSA\s*[-:]\s*/i, ""),
-            })),
-          );
+          const topics = Array.isArray(result?.topics) ? result.topics : [];
+          setDsaTopics(topics.map((topic) => ({
+            ...topic,
+            displayName: topic.name.replace(/^DSA\s*[-:]\s*/i, ""),
+          })));
+          if (topics.length === 0) {
+            setError("No DSA topics are available right now. Please try again.");
+          }
         }
       })
       .catch((err) => {
@@ -86,9 +81,12 @@ export function OnboardingModal() {
     return () => {
       cancelled = true;
     };
-  }, [isOpen, step]);
+  }, [dsaTopics.length, isOpen, step, topicsRetry]);
 
   if (!isOpen) return null;
+
+  const showTopicsLoading =
+    topicsLoading || (step === 1 && dsaTopics.length === 0 && !error);
 
   const close = () => {
     setSelectedTopics(new Set());
@@ -289,12 +287,9 @@ export function OnboardingModal() {
         Java: "java",
         C: "c",
       }[selectedLang];
+      let languageResult;
       if (language && !state.user?.guest) {
-        try {
-          await onboardingApi.updateLanguage(language);
-        } catch (err) {
-          console.warn("Backend language sync note:", err.message);
-        }
+        languageResult = await onboardingApi.updateLanguage(language);
       }
 
       setState((s) => ({
@@ -305,7 +300,14 @@ export function OnboardingModal() {
         calibrating: true,
         view: "home",
         user: s.user
-          ? { ...s.user, ...(result.user || {}), onboarded: true }
+          ? {
+              ...s.user,
+              ...(result.user || {}),
+              ...(languageResult?.language
+                ? { preferredLanguage: languageResult.language }
+                : {}),
+              onboarded: true,
+            }
           : s.user,
       }));
 
@@ -500,8 +502,27 @@ export function OnboardingModal() {
             <h2 className="onboard-title">Choose your level for each topic</h2>
             <p className="onboard-subtitle">
               No entry test. Pick the topics you want and a level for each.
-              Saved as you click.
+              Your choices will be saved when you start your journey.
             </p>
+
+            {error && (
+              <div className="onboard-error-banner" role="alert">
+                {error}
+                {!topicsLoading && (
+                  <button
+                    type="button"
+                    className="modal-btn-white"
+                    onClick={() => {
+                      setError("");
+                      setTopicsLoading(true);
+                      setTopicsRetry((retry) => retry + 1);
+                    }}
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Quick Actions (Matching Image 2) */}
             <div className="onboard-quick-actions">
@@ -509,6 +530,7 @@ export function OnboardingModal() {
                 type="button"
                 className="quick-pill-btn"
                 onClick={handleQuickAllEasy}
+                disabled={showTopicsLoading || dsaTopics.length === 0}
               >
                 Quick start: all Easy
               </button>
@@ -516,6 +538,7 @@ export function OnboardingModal() {
                 type="button"
                 className="quick-pill-btn"
                 onClick={handleStartFromScratch}
+                disabled={showTopicsLoading || dsaTopics.length === 0}
               >
                 Start from scratch
               </button>
@@ -523,7 +546,7 @@ export function OnboardingModal() {
 
             {/* Strictly DSA Topics List with Consistent Active Level Highlighting */}
             <div className="onboard-topics-list">
-              {topicsLoading ? (
+              {showTopicsLoading ? (
                 <p role="status">Loading DSA topics...</p>
               ) : (
                 dsaTopics.map(({ name, displayName, slug }) => {
@@ -565,7 +588,7 @@ export function OnboardingModal() {
             <div className="onboard-step-footer">
               <div className="footer-left-group">
                 <span className="chosen-count-label">
-                  {dsaTopics.length} DSA topics calibrated
+                  {selectedTopics.size} of {dsaTopics.length} DSA topics selected
                 </span>
                 <button
                   type="button"
@@ -579,6 +602,11 @@ export function OnboardingModal() {
                 type="button"
                 className="modal-btn-dark"
                 onClick={() => setStep(2)}
+                disabled={
+                  showTopicsLoading ||
+                  dsaTopics.length === 0 ||
+                  selectedTopics.size === 0
+                }
               >
                 Next
               </button>

@@ -81,16 +81,43 @@ export function Header() {
       ? state.user.email?.split("@")[0]
       : "Guest");
   const isSignedIn = Boolean(state.user && !state.user.guest);
-  const headerStats = state.headerStats;
+  // const headerStats = state.headerStats;
+  // const tierLabel = state.calibrating
+  //   ? "Calibrating"
+  //   : headerStats?.tier || (isSignedIn ? "—" : tierInfo.full);
+  // const scoreLabel =
+  //   isSignedIn && !headerStats
+  //     ? "—"
+  //     : Math.floor((state.score || 0) / 10).toLocaleString();
+  // const coinsLabel = isSignedIn && !headerStats ? "—" : state.coins || 0;
+  // const streakLabel = isSignedIn && !headerStats ? "—" : state.streak || 0;
+
+  //   const headerStats = state.headerStats;
+  // const tierLabel = state.calibrating
+  //   ? "Calibrating"
+  //   : headerStats?.tier || state.tier || tierInfo.full || "—";
+  
+  // const scoreLabel = Math.floor((state.score ?? headerStats?.score ?? 0) / 10).toLocaleString();
+  // const coinsLabel = isSignedIn ? (headerStats?.coins ?? state.coins ?? 0) : (state.coins ?? 0);
+  // const streakLabel = headerStats?.streak ?? state.streak ?? 0;
+
+
+   const headerStats = state.headerStats;
   const tierLabel = state.calibrating
     ? "Calibrating"
-    : headerStats?.tier || (isSignedIn ? "—" : tierInfo.full);
-  const scoreLabel =
-    isSignedIn && !headerStats
-      ? "—"
-      : Math.floor((state.score || 0) / 10).toLocaleString();
-  const coinsLabel = isSignedIn && !headerStats ? "—" : state.coins || 0;
-  const streakLabel = isSignedIn && !headerStats ? "—" : state.streak || 0;
+    : headerStats?.tier || state.tier || tierInfo.full || "—";
+
+  const scoreLabel = (headerStats?.score ?? state.score ?? state.user?.score ?? 0).toLocaleString();
+  const coinsLabel = headerStats?.coins ?? state.coins ?? state.user?.coins ?? 0;
+  const streakLabel = headerStats?.streak ?? state.streak ?? state.user?.streak ?? state.user?.currentStreak ?? 0;
+
+  // TEMP DEBUG - check console
+  console.log("STREAK DEBUG:", { 
+    headerStatsStreak: headerStats?.streak, 
+    stateStreak: state.streak, 
+    userStreak: state.user?.streak,
+    fullState: state 
+  });
 
   return (
     <header>

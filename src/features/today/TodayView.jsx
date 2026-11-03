@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useCalibr8 } from "../../context/Calibr8Context";
 import { VOCABULARY_WORDS } from "../../data/vocabularyData";
 import { todayKey, ymd, ShieldBadge } from "../../utils/tierUtils";
@@ -17,11 +17,24 @@ export function TodayView() {
     showToast,
   } = useCalibr8();
 
-  const now = useMemo(() => new Date(), []);
-  const h = now.getHours();
-  const greeting =
-    h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  // FIXED: live clock in user timezone
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const greeting = useMemo(() => {
+    const h = now.getHours(); // already in user timezone
+    if (h < 5) return "Good night";
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    if (h < 21) return "Good evening";
+    return "Good night";
+  }, [now]);
+
   const st = state.streak || 0;
+  // ... rest of your file same as before
   const milestones = [7, 14, 30, 60, 100, 365];
   const nextMilestone = milestones.find((x) => x > st) || 365;
 
@@ -72,26 +85,40 @@ export function TodayView() {
     );
   }
 
-  // Week days for streak card: 6, 5, 4, 3, 2, 1, 0 days ago
-  const weekDayLetters = "SMTWTFS";
-  const weekDays = [6, 5, 4, 3, 2, 1, 0].map((daysAgo) => {
-    const dateOnDay = new Date(now.getTime() - daysAgo * 864e5);
-    const letter = weekDayLetters[dateOnDay.getDay()];
-    const isOn = state.dailyDone
-      ? daysAgo < st
-      : daysAgo >= 1 && daysAgo <= st;
-    const isNow = daysAgo === 0 && !state.dailyDone;
+  // FIXED: Week = Monday to Sunday (current week)
+  const weekDays = useMemo(() => {
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(0, 0, 0, 0);
 
-    return (
-      <div
-        key={daysAgo}
-        className={`wd ${isOn ? "on" : ""} ${isNow ? "now" : ""}`}
-      >
-        <i>{isOn ? "🔥" : ""}</i>
-        {letter}
-      </div>
-    );
-  });
+    const day = now.getDay(); // 0=Sun, 1=Mon
+    const mondayOffset = (day + 6) % 7; // how many days since Monday
+    const monday = new Date(todayMidnight);
+    monday.setDate(todayMidnight.getDate() - mondayOffset);
+
+    const letters = ["M", "T", "W", "T", "F", "S", "S"];
+
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      
+      const diff = Math.round((todayMidnight - date) / 864e5); // 0=today, 1=yesterday, -1=tomorrow
+      const isToday = diff === 0;
+      const isFuture = diff < 0;
+
+      // same logic as before, but based on diff
+      const isOn = !isFuture && (
+        state.dailyDone ? diff < st : diff >= 1 && diff <= st
+      );
+      const isNow = isToday && !state.dailyDone;
+
+      return (
+        <div key={i} className={`wd ${isOn ? "on" : ""} ${isNow ? "now" : ""}`}>
+          <i>{isOn ? "🔥" : ""}</i>
+          {letters[i]}
+        </div>
+      );
+    });
+  }, [now, st, state.dailyDone]);
 
   const dailyQ = state.daily || createQuestion(false);
   const stretchQ = state.stretch || createQuestion(true);
