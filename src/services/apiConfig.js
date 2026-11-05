@@ -92,7 +92,7 @@ export const apiConfig = {
       return envUrl.trim().replace(/\/+$/, "");
     }
 
-    return "http://localhost:3000";
+    return typeof window !== "undefined" ? window.location.origin : "";
   },
 
   /**
