@@ -1584,7 +1584,7 @@ export function SolveView() {
       </div>
 
       {/* Complexity Prediction Quiz Card */}
-      <div className="card" style={{ marginTop: "16px" }}>
+      {/* <div className="card" style={{ marginTop: "16px" }}>
         <div
           style={{
             display: "flex",
@@ -1622,7 +1622,7 @@ export function SolveView() {
             </span>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Private Notes Drawer */}
       {showNotes && (
